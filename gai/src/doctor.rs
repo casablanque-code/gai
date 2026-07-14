@@ -33,6 +33,11 @@ pub fn run(name: &str) -> anyhow::Result<()> {
         reality::check(name, effective_servers).ok()
     };
 
+    println!(
+        "  (reality check via {:?}, systemd-resolved stub: {})\n",
+        effective_servers, resolv.is_systemd_stub
+    );
+
     println!("RESOLUTION PATH (simulated):");
     for (i, step) in outcome.steps.iter().enumerate() {
         println!("  {}. [{:?}] {:?}", i + 1, step.source, step.result);
