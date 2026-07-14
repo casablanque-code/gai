@@ -7,6 +7,7 @@
 //! This crate reads configuration and asks resolvers questions — it never
 //! attaches to a running process.
 
+pub mod mdns;
 pub mod reality;
 pub mod resolved;
 pub mod resolver;

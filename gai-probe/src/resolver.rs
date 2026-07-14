@@ -102,6 +102,19 @@ impl SystemSourceResolver {
         }
         Self::query(name, &self.resolved_nameservers)
     }
+
+    /// One-shot mDNS A-record query on 224.0.0.251:5353, ~500ms deadline.
+    /// This is what mdns4_minimal actually does under the hood — a single
+    /// best-effort broadcast, not a persistent responder.
+    fn lookup_mdns(name: &str) -> StepResult {
+        match crate::mdns::query_a_record(name) {
+            Ok(addrs) if !addrs.is_empty() => StepResult::Found(addrs),
+            Ok(_) => StepResult::NotFound,
+            Err(e) => StepResult::Skipped {
+                reason: format!("mDNS query failed: {e}"),
+            },
+        }
+    }
 }
 
 impl SourceResolver for SystemSourceResolver {
@@ -109,14 +122,12 @@ impl SourceResolver for SystemSourceResolver {
         match source {
             NssSource::Files => self.lookup_hosts(name),
             NssSource::Dns => self.lookup_dns(name),
-            // mDNS and myhostname probing land in a follow-up patch, not
-            // MVP. Marking as Skipped is honest — it does not pretend the
-            // chain continued past a source we can't actually answer for.
-            NssSource::Mdns4Minimal
-            | NssSource::Mdns6Minimal
-            | NssSource::Mdns4
-            | NssSource::Mdns6 => StepResult::Skipped {
-                reason: "mDNS probing not implemented in MVP".into(),
+            // IPv6 mDNS (AAAA queries) still lands in a follow-up patch —
+            // the query builder above only asks QTYPE=A. IPv4 minimal/full
+            // variants both get the real one-shot probe.
+            NssSource::Mdns4Minimal | NssSource::Mdns4 => Self::lookup_mdns(name),
+            NssSource::Mdns6Minimal | NssSource::Mdns6 => StepResult::Skipped {
+                reason: "mDNS AAAA (IPv6) probing not implemented yet".into(),
             },
             NssSource::Myhostname => StepResult::Skipped {
                 reason: "myhostname probing not implemented in MVP".into(),
