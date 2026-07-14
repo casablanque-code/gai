@@ -10,6 +10,9 @@ env:
   BIN_NAME: gai
   TARGET: x86_64-unknown-linux-musl
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
