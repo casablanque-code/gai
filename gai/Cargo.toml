@@ -1,0 +1,16 @@
+[package]
+name = "gai"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "gai"
+path = "src/main.rs"
+
+[dependencies]
+gai-core = { path = "../gai-core" }
+gai-probe = { path = "../gai-probe" }
+anyhow.workspace = true
+clap.workspace = true

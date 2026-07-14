@@ -1,0 +1,21 @@
+[package]
+name = "gai-probe"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+gai-core = { path = "../gai-core" }
+thiserror.workspace = true
+anyhow.workspace = true
+# hickory-resolver: does raw DNS queries against a *given* server, bypassing
+# NSS entirely. This is how we get an independent "reality" answer instead
+# of trusting whatever the simulated chain produced.
+hickory-resolver = "0.24"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+# zbus: talks to org.freedesktop.resolve1 over the system D-Bus to get the
+# per-link nameservers that actually back the 127.0.0.53 stub in
+# resolv.conf. Blocking API is fine here — gai is a short-lived CLI, not
+# a daemon.
+zbus = "4"

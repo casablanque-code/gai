@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+    "gai-core",
+    "gai-probe",
+    "gai",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["casablanque-code"]
+license = "MIT"
+repository = "https://github.com/casablanque-code/gai"
+
+[workspace.dependencies]
+thiserror = "1"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }

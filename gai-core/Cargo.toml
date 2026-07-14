@@ -1,0 +1,13 @@
+[package]
+name = "gai-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
