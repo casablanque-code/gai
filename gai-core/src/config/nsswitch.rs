@@ -32,11 +32,7 @@ fn strip_comment(line: &str) -> &str {
     }
 }
 
-fn parse_hosts_line(
-    rest: &str,
-    path: &Path,
-    line_no: usize,
-) -> Result<Vec<NssEntry>, ConfigError> {
+fn parse_hosts_line(rest: &str, path: &Path, line_no: usize) -> Result<Vec<NssEntry>, ConfigError> {
     let mut entries = Vec::new();
     let mut pending_source: Option<NssSource> = None;
     let mut pending_criteria: Vec<NssCriterion> = Vec::new();

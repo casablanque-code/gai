@@ -39,11 +39,7 @@ pub fn simulate(
     for entry in &config.hosts {
         let result = resolver.resolve(&entry.source, name);
         let status = classify(&result);
-        let matched_criterion = entry
-            .criteria
-            .iter()
-            .find(|c| c.status == status)
-            .cloned();
+        let matched_criterion = entry.criteria.iter().find(|c| c.status == status).cloned();
 
         let halts = match &matched_criterion {
             Some(NssCriterion {

@@ -51,9 +51,9 @@ fn decode_address(family: i32, bytes: &[u8]) -> Option<IpAddr> {
     const AF_INET: i32 = 2;
     const AF_INET6: i32 = 10;
     match family {
-        AF_INET if bytes.len() == 4 => {
-            Some(IpAddr::V4(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3])))
-        }
+        AF_INET if bytes.len() == 4 => Some(IpAddr::V4(Ipv4Addr::new(
+            bytes[0], bytes[1], bytes[2], bytes[3],
+        ))),
         AF_INET6 if bytes.len() == 16 => {
             let mut octets = [0u8; 16];
             octets.copy_from_slice(bytes);

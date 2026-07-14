@@ -22,7 +22,7 @@ pub fn detect_resolver_runtime(binary_path: &Path) -> anyhow::Result<ResolverRun
 
     let is_dynamic = bytes.windows(4).any(|w| w == b"\x7fELF")
         && find_subslice(&bytes, b"/lib64/ld-linux").is_some()
-            || find_subslice(&bytes, b"/lib/ld-linux").is_some();
+        || find_subslice(&bytes, b"/lib/ld-linux").is_some();
 
     let looks_like_go = find_subslice(&bytes, b"Go build ID:").is_some()
         || find_subslice(&bytes, b"golang.org/x").is_some();

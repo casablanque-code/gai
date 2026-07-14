@@ -51,7 +51,8 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             println!(
                 "  The simulated OS chain never reached DNS — it halted earlier in \
                  nsswitch.conf. A direct DNS query against the same nameservers \
-                 succeeded: {:?}", reality.addresses
+                 succeeded: {:?}",
+                reality.addresses
             );
             println!("  FIX: review the [NOTFOUND=return] rule that stopped the chain.");
         }

@@ -36,7 +36,10 @@ pub fn run(name: &str) -> anyhow::Result<()> {
         };
         println!("  {}. [{:?}] {status}", i + 1, step.source);
         if let Some(criterion) = &step.halted_chain {
-            println!("     -> chain halted: [{:?}={:?}]", criterion.status, criterion.action);
+            println!(
+                "     -> chain halted: [{:?}={:?}]",
+                criterion.status, criterion.action
+            );
         }
     }
 
