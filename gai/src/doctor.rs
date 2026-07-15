@@ -51,32 +51,66 @@ pub fn run(name: &str) -> anyhow::Result<()> {
         && !outcome.resolved();
 
     println!("\nDIAGNOSIS:");
-    match (&reality_result, outcome.resolved(), halted_early) {
-        (Some(reality), false, true) if !reality.addresses.is_empty() => {
-            println!(
-                "  The simulated OS chain never reached DNS — it halted earlier in \
-                 nsswitch.conf. A direct DNS query against the same nameservers \
-                 succeeded: {:?}",
-                reality.addresses
-            );
-            println!("  FIX: review the [NOTFOUND=return] rule that stopped the chain.");
+    if !outcome.resolved() {
+        if halted_early {
+            match &reality_result {
+                Some(reality) if !reality.addresses.is_empty() => {
+                    println!(
+                        "  The simulated OS chain never reached DNS — it halted earlier in \
+                         nsswitch.conf. A direct DNS query against the same nameservers \
+                         succeeded: {:?}",
+                        reality.addresses
+                    );
+                    println!("  FIX: review the [NOTFOUND=return] rule that stopped the chain.");
+                }
+                Some(_) => {
+                    println!(
+                        "  The simulated OS chain halted early in nsswitch.conf, but a \
+                         direct DNS query also found nothing. No discrepancy — this name \
+                         likely doesn't exist anywhere."
+                    );
+                }
+                None => {
+                    println!(
+                        "  The simulated OS chain halted early in nsswitch.conf. No reality \
+                         check was possible (no nameservers configured or the query failed), \
+                         so this could not be cross-checked against DNS."
+                    );
+                }
+            }
+        } else {
+            match &reality_result {
+                None => println!(
+                    "  Resolution failed and no nameservers were configured to cross-check."
+                ),
+                Some(reality) if reality.addresses.is_empty() => println!(
+                    "  Resolution failed through the full chain, and a direct DNS query \
+                     agrees — this name doesn't resolve."
+                ),
+                Some(reality) => println!(
+                    "  Resolution failed through the simulated chain, but a direct DNS \
+                     query found {:?}. Something in the chain (not covered by an \
+                     early-halt rule) is suppressing a real answer.",
+                    reality.addresses
+                ),
+            }
         }
-        (Some(reality), true, _) if reality.addresses != outcome.final_addresses => {
-            println!(
+    } else {
+        match &reality_result {
+            None => println!(
+                "  Resolved to {:?} via the simulated chain, but no reality check was \
+                 possible (no nameservers configured or the query failed) — take this \
+                 result on trust rather than as cross-checked.",
+                outcome.final_addresses
+            ),
+            Some(reality) if reality.addresses == outcome.final_addresses => {
+                println!("  Resolution succeeded and matches direct DNS. No discrepancy found.")
+            }
+            Some(reality) => println!(
                 "  The OS chain and a direct DNS query disagree: {:?} vs {:?}. \
-                 Something earlier in the chain (files/mdns) is answering \
-                 instead of DNS.",
+                 Something earlier in the chain (files/mdns) is answering instead of DNS.",
                 outcome.final_addresses, reality.addresses
-            );
-        }
-        (_, true, _) => {
-            println!("  Resolution succeeded and matches direct DNS. No discrepancy found.");
-        }
-        (None, false, _) => {
-            println!("  Resolution failed and no nameservers were configured to cross-check.");
-        }
-        _ => {
-            println!("  No discrepancy detected between the simulated path and reality.");
+            ),
         }
     }
 
