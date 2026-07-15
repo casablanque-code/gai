@@ -31,3 +31,53 @@ pub fn parse_hosts(path: &Path) -> Result<Vec<HostsEntry>, ConfigError> {
 
     Ok(entries)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn parses_multiple_names_per_ip() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(f, "127.0.0.1 localhost localhost.localdomain").unwrap();
+        writeln!(f, "10.0.0.1 testhost.local testhost").unwrap();
+        let entries = parse_hosts(f.path()).unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[1].ip, "10.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(entries[1].names, vec!["testhost.local", "testhost"]);
+    }
+
+    #[test]
+    fn ignores_comments_and_blank_lines() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(f, "# comment line").unwrap();
+        writeln!(f).unwrap();
+        writeln!(f, "10.0.0.2 realhost # trailing comment").unwrap();
+        let entries = parse_hosts(f.path()).unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].names, vec!["realhost"]);
+    }
+
+    #[test]
+    fn skips_malformed_lines_without_erroring() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(f, "not-an-ip somehost").unwrap();
+        writeln!(f, "10.0.0.3 validhost").unwrap();
+        let entries = parse_hosts(f.path()).unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].names, vec!["validhost"]);
+    }
+
+    #[test]
+    fn parses_ipv6_entries() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(f, "::1 ip6-localhost ip6-loopback").unwrap();
+        let entries = parse_hosts(f.path()).unwrap();
+
+        assert_eq!(entries[0].ip, "::1".parse::<IpAddr>().unwrap());
+    }
+}

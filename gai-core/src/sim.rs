@@ -166,4 +166,104 @@ mod tests {
         assert_eq!(outcome.steps.len(), 1);
         assert!(outcome.resolved());
     }
+
+    #[test]
+    fn notfound_without_criterion_falls_through_to_next_source() {
+        // No [NOTFOUND=...] criterion at all on `files` — default glibc
+        // behavior is to continue past NOTFOUND, unlike SUCCESS which
+        // halts by default.
+        let config = NsswitchConfig {
+            hosts: vec![
+                NssEntry {
+                    source: NssSource::Files,
+                    criteria: vec![],
+                },
+                NssEntry {
+                    source: NssSource::Dns,
+                    criteria: vec![],
+                },
+            ],
+        };
+        let mut resolver = ScriptedResolver {
+            answers: vec![
+                (NssSource::Files, StepResult::NotFound),
+                (
+                    NssSource::Dns,
+                    StepResult::Found(vec!["93.184.216.34".parse().unwrap()]),
+                ),
+            ],
+        };
+
+        let outcome = simulate(&config, "example.com", &mut resolver);
+
+        assert_eq!(outcome.steps.len(), 2, "must fall through to dns");
+        assert!(outcome.resolved());
+        assert_eq!(outcome.final_addresses, vec!["93.184.216.34".parse::<IpAddr>().unwrap()]);
+    }
+
+    #[test]
+    fn explicit_continue_action_falls_through_even_on_success() {
+        // [SUCCESS=continue] is unusual but legal — a source can find
+        // something and still not halt the chain if configured that way.
+        let config = NsswitchConfig {
+            hosts: vec![
+                NssEntry {
+                    source: NssSource::Myhostname,
+                    criteria: vec![NssCriterion {
+                        status: NssStatus::Success,
+                        action: NssAction::Continue,
+                    }],
+                },
+                NssEntry {
+                    source: NssSource::Dns,
+                    criteria: vec![],
+                },
+            ],
+        };
+        let mut resolver = ScriptedResolver {
+            answers: vec![
+                (
+                    NssSource::Myhostname,
+                    StepResult::Found(vec!["127.0.1.1".parse().unwrap()]),
+                ),
+                (
+                    NssSource::Dns,
+                    StepResult::Found(vec!["10.0.0.5".parse().unwrap()]),
+                ),
+            ],
+        };
+
+        let outcome = simulate(&config, "myhost", &mut resolver);
+
+        assert_eq!(outcome.steps.len(), 2, "continue must not stop the chain");
+        // dns ran last and is what final_addresses reflects
+        assert_eq!(outcome.final_addresses, vec!["10.0.0.5".parse::<IpAddr>().unwrap()]);
+    }
+
+    #[test]
+    fn full_chain_exhausted_nothing_found_anywhere() {
+        let config = NsswitchConfig {
+            hosts: vec![
+                NssEntry {
+                    source: NssSource::Files,
+                    criteria: vec![],
+                },
+                NssEntry {
+                    source: NssSource::Dns,
+                    criteria: vec![],
+                },
+            ],
+        };
+        let mut resolver = ScriptedResolver {
+            answers: vec![
+                (NssSource::Files, StepResult::NotFound),
+                (NssSource::Dns, StepResult::NotFound),
+            ],
+        };
+
+        let outcome = simulate(&config, "doesnotexist.invalid", &mut resolver);
+
+        assert_eq!(outcome.steps.len(), 2, "every source must be tried");
+        assert!(!outcome.resolved());
+    }
 }

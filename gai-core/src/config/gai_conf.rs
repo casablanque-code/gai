@@ -47,3 +47,32 @@ pub fn parse_gai_conf(path: &Path) -> Result<GaiConfig, ConfigError> {
 
     Ok(cfg)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn absent_file_uses_glibc_default_prefer_ipv6() {
+        let cfg = parse_gai_conf(Path::new("/nonexistent/gai.conf")).unwrap();
+        assert!(cfg.prefer_ipv6);
+        assert!(cfg.label_rules.is_empty());
+        assert!(cfg.precedence_rules.is_empty());
+    }
+
+    #[test]
+    fn parses_label_and_precedence_rules() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        use std::io::Write;
+        writeln!(f, "# comment").unwrap();
+        writeln!(f, "label ::1/128 0").unwrap();
+        writeln!(f, "precedence ::ffff:0:0/96 100").unwrap();
+        let cfg = parse_gai_conf(f.path()).unwrap();
+
+        assert_eq!(cfg.label_rules, vec![("::1/128".to_string(), 0)]);
+        assert_eq!(
+            cfg.precedence_rules,
+            vec![("::ffff:0:0/96".to_string(), 100)]
+        );
+    }
+}
