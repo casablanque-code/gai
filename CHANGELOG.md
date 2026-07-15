@@ -6,6 +6,14 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-15
+### Docs
+- `gai-core`: full field/variant-level rustdoc for every public type in
+  `types.rs` (previously undocumented individually), plus a compiling
+  usage example in the crate-level docs. `gai-probe` and `gai-inspector`
+  are re-released at the same version (shared workspace version) with no
+  functional changes.
+
 ## [0.1.4] - 2026-07-15
 ### Changed
 - CLI package renamed from `gai-cli` to `gai-inspector` — `gai-cli` was
@@ -73,7 +81,8 @@ versioning follows [SemVer](https://semver.org/).
   `x86_64-unknown-linux-musl` binary, plus `install.sh` for one-line
   installs on a VPS.
 
-[Unreleased]: https://github.com/casablanque-code/gai/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/casablanque-code/gai/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/casablanque-code/gai/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/casablanque-code/gai/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/casablanque-code/gai/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/casablanque-code/gai/compare/v0.1.1...v0.1.2

@@ -11,12 +11,19 @@ pub trait SourceResolver {
     fn resolve(&mut self, source: &NssSource, name: &str) -> StepResult;
 }
 
+/// Result of walking the nsswitch chain via [`simulate`].
 pub struct SimulationOutcome {
+    /// Every source tried, in order, with its result and whether it
+    /// halted the chain. Sources after a halt are never tried and never
+    /// appear here — that's the whole point of surfacing this list.
     pub steps: Vec<ResolutionStep>,
+    /// The addresses from the step that halted the chain with a
+    /// `Found` result, or empty if nothing was found.
     pub final_addresses: Vec<IpAddr>,
 }
 
 impl SimulationOutcome {
+    /// Whether the chain produced at least one address.
     pub fn resolved(&self) -> bool {
         !self.final_addresses.is_empty()
     }
