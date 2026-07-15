@@ -37,7 +37,16 @@ cargo build --workspace --quiet
 
 echo "==> committing"
 git add Cargo.toml Cargo.lock CHANGELOG.md
-git commit -m "chore(release): v${NEW_VERSION}"
+if git diff --cached --quiet; then
+  echo "    nothing to commit (version/lock/changelog already up to date) — continuing"
+else
+  git commit -m "chore(release): v${NEW_VERSION}"
+fi
+
+if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+  echo "error: tag v${NEW_VERSION} already exists locally" >&2
+  exit 1
+fi
 
 echo "==> tagging"
 git tag "v${NEW_VERSION}"
