@@ -518,8 +518,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "gai-cli"
-version = "0.1.3"
+name = "gai-core"
+version = "0.1.4"
+dependencies = [
+ "serde",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "gai-inspector"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -528,17 +537,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "gai-core"
-version = "0.1.3"
-dependencies = [
- "serde",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
 name = "gai-probe"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "gai-core",
