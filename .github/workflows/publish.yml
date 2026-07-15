@@ -1,0 +1,45 @@
+name: Publish crates
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag must match Cargo.toml workspace version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::tag v${TAG_VERSION} does not match Cargo.toml version ${CARGO_VERSION}"
+            exit 1
+          fi
+
+  publish:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Order matters: gai-probe and gai-cli depend on gai-core by path,
+      # and crates.io publish resolves path deps against what's already
+      # published there — leaf crate first.
+      - name: publish gai-core
+        run: cargo publish -p gai-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: wait for index
+        run: sleep 30
+      - name: publish gai-probe
+        run: cargo publish -p gai-probe --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: wait for index
+        run: sleep 30
+      - name: publish gai-cli
+        run: cargo publish -p gai-cli --token ${{ secrets.CARGO_REGISTRY_TOKEN }}

@@ -1,16 +1,21 @@
 [package]
-name = "gai"
+name = "gai-cli"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "gai — getaddrinfo inspector. Explains how a name turns into an IP: nsswitch, resolv.conf, systemd-resolved, mDNS, and where it disagrees with a direct DNS query. `cargo install gai-cli` installs the `gai` binary."
+keywords = ["dns", "cli", "getaddrinfo", "nsswitch", "diagnostics"]
+categories = ["command-line-utilities", "network-programming"]
 
 [[bin]]
 name = "gai"
 path = "src/main.rs"
 
 [dependencies]
-gai-core = { path = "../gai-core" }
-gai-probe = { path = "../gai-probe" }
+gai-core = { path = "../gai-core", version = "0.1.3" }
+gai-probe = { path = "../gai-probe", version = "0.1.3" }
 anyhow.workspace = true
 clap.workspace = true

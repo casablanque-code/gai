@@ -12,6 +12,8 @@ edition = "2021"
 authors = ["casablanque-code"]
 license = "MIT"
 repository = "https://github.com/casablanque-code/gai"
+homepage = "https://github.com/casablanque-code/gai"
+readme = "README.md"
 
 [workspace.dependencies]
 thiserror = "1"
