@@ -22,7 +22,15 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
             Protocol::Udp,
         ));
     }
-    let resolver = Resolver::new(cfg, ResolverOpts::default())?;
+    // Same rationale as SystemSourceResolver::query: hickory-resolver
+    // reads /etc/hosts by default regardless of an explicit remote
+    // ResolverConfig. The whole point of a reality check is to be an
+    // independent signal — with hosts-file lookup left on, a Files-based
+    // resolution and this "independent" check would agree by
+    // construction, masking the exact discrepancy gai exists to find.
+    let mut opts = ResolverOpts::default();
+    opts.use_hosts_file = false;
+    let resolver = Resolver::new(cfg, opts)?;
     let addresses = match resolver.lookup_ip(name) {
         Ok(lookup) => lookup.iter().collect(),
         Err(_) => Vec::new(),

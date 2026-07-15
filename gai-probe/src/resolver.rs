@@ -72,7 +72,14 @@ impl SystemSourceResolver {
                 Protocol::Udp,
             ));
         }
-        match Resolver::new(cfg, ResolverOpts::default()) {
+        // Critical: hickory-resolver consults /etc/hosts by default even
+        // with an explicit remote-only ResolverConfig. Left enabled, this
+        // "dns" source would silently double as a Files lookup, which is
+        // exactly the layering confusion gai exists to expose. Disabled
+        // so this function is a pure, wire-level DNS query.
+        let mut opts = ResolverOpts::default();
+        opts.use_hosts_file = false;
+        match Resolver::new(cfg, opts) {
             Ok(resolver) => match resolver.lookup_ip(name) {
                 Ok(lookup) => {
                     let addrs: Vec<IpAddr> = lookup.iter().collect();
