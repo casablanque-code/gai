@@ -6,6 +6,28 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-15
+### Changed
+- CLI package renamed from `gai-cli` to `gai-inspector` — `gai-cli` was
+  also already taken on crates.io. The binary itself is still named
+  `gai`; `cargo install gai-inspector` installs it.
+### Added
+- `gai-core`, `gai-probe`, and the CLI now carry crates.io publish
+  metadata (description, keywords, categories) and a `publish.yml`
+  workflow, gated behind the same tag/version check as `release.yml`.
+- `scripts/release.sh`: one command to bump the version, regenerate
+  `Cargo.lock`, commit, tag, and push.
+- `CHANGELOG.md` (this file).
+- `gai-core`: test coverage for `hosts.rs` and `gai_conf.rs` (previously
+  untested), plus `sim.rs` edge cases (`NOTFOUND` without a criterion,
+  explicit `[SUCCESS=continue]`, full chain exhausted).
+- `gai-core/tests/scenarios.rs`: end-to-end tests parsing real
+  nsswitch.conf text through `simulate()`, including the
+  `mdns4_minimal [NOTFOUND=return]` trap from the original project spec.
+### CI
+- `ci.yml` now only runs on `*.rs` / `Cargo.toml` / `Cargo.lock` changes,
+  so doc-only edits don't trigger the full pipeline.
+
 ## [0.1.3] - 2026-07-15
 ### Fixed
 - `gai-probe`: disabled hickory-resolver's implicit `/etc/hosts` lookup
@@ -51,7 +73,8 @@ versioning follows [SemVer](https://semver.org/).
   `x86_64-unknown-linux-musl` binary, plus `install.sh` for one-line
   installs on a VPS.
 
-[Unreleased]: https://github.com/casablanque-code/gai/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/casablanque-code/gai/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/casablanque-code/gai/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/casablanque-code/gai/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/casablanque-code/gai/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/casablanque-code/gai/compare/v0.1.0...v0.1.1

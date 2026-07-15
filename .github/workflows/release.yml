@@ -43,7 +43,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: build static release binary
-        run: cargo build --release --package gai-cli --target ${{ env.TARGET }}
+        run: cargo build --release --package gai-inspector --target ${{ env.TARGET }}
 
       - name: package
         run: |

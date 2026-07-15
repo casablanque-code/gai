@@ -30,7 +30,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # Order matters: gai-probe and gai-cli depend on gai-core by path,
+      # Order matters: gai-probe and gai-inspector depend on gai-core by path,
       # and crates.io publish resolves path deps against what's already
       # published there — leaf crate first.
       - name: publish gai-core
@@ -41,5 +41,5 @@ jobs:
         run: cargo publish -p gai-probe --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
       - name: wait for index
         run: sleep 30
-      - name: publish gai-cli
-        run: cargo publish -p gai-cli --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: publish gai-inspector
+        run: cargo publish -p gai-inspector --token ${{ secrets.CARGO_REGISTRY_TOKEN }}

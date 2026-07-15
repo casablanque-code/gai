@@ -50,13 +50,13 @@ Pulls the latest `x86_64-unknown-linux-musl` binary from
 ## Install via cargo
 
 ```
-cargo install gai-cli   # installs a binary named `gai`
+cargo install gai-inspector   # installs a binary named `gai`
 ```
 
 ## Build from source
 
 ```
-cargo build --release --package gai-cli
+cargo build --release --package gai-inspector
 ```
 
 ## What it actually does
@@ -87,7 +87,7 @@ cargo build --release --package gai-cli
 |---|---|---|
 | `gai-core` | [`gai-core`](https://crates.io/crates/gai-core) | Pure parsing + simulation logic, no I/O, unit-tested against fixtures |
 | `gai-probe` | [`gai-probe`](https://crates.io/crates/gai-probe) | All real I/O: DNS queries, `/etc/hosts` reads, systemd-resolved D-Bus, mDNS |
-| `gai` (package `gai-cli`) | [`gai-cli`](https://crates.io/crates/gai-cli) | The CLI |
+| `gai` (package `gai-inspector`) | [`gai-inspector`](https://crates.io/crates/gai-inspector) | The CLI |
 
 ## Contributing / releasing
 
