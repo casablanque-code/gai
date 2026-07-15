@@ -123,7 +123,11 @@ fn scenario_realistic_multiline_nsswitch_conf() {
     );
     let config = parse_nsswitch(fixture.path()).expect("valid nsswitch.conf");
 
-    assert_eq!(config.hosts.len(), 4, "files, mdns4_minimal, dns, myhostname");
+    assert_eq!(
+        config.hosts.len(),
+        4,
+        "files, mdns4_minimal, dns, myhostname"
+    );
     assert_eq!(config.hosts[0].source, NssSource::Files);
     assert_eq!(config.hosts[1].source, NssSource::Mdns4Minimal);
     assert_eq!(config.hosts[2].source, NssSource::Dns);

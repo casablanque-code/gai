@@ -198,7 +198,10 @@ mod tests {
 
         assert_eq!(outcome.steps.len(), 2, "must fall through to dns");
         assert!(outcome.resolved());
-        assert_eq!(outcome.final_addresses, vec!["93.184.216.34".parse::<IpAddr>().unwrap()]);
+        assert_eq!(
+            outcome.final_addresses,
+            vec!["93.184.216.34".parse::<IpAddr>().unwrap()]
+        );
     }
 
     #[test]
@@ -237,7 +240,10 @@ mod tests {
 
         assert_eq!(outcome.steps.len(), 2, "continue must not stop the chain");
         // dns ran last and is what final_addresses reflects
-        assert_eq!(outcome.final_addresses, vec!["10.0.0.5".parse::<IpAddr>().unwrap()]);
+        assert_eq!(
+            outcome.final_addresses,
+            vec!["10.0.0.5".parse::<IpAddr>().unwrap()]
+        );
     }
 
     #[test]
