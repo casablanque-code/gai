@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "gai-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "serde",
  "tempfile",
@@ -528,7 +528,7 @@ dependencies = [
 
 [[package]]
 name = "gai-inspector"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -538,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "gai-probe"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "gai-core",
