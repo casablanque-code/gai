@@ -122,6 +122,18 @@ impl SystemSourceResolver {
             },
         }
     }
+
+    /// Same as `lookup_mdns` but for AAAA (IPv6) records, backing
+    /// mdns6/mdns6_minimal.
+    fn lookup_mdns6(name: &str) -> StepResult {
+        match crate::mdns::query_aaaa_record(name) {
+            Ok(addrs) if !addrs.is_empty() => StepResult::Found(addrs),
+            Ok(_) => StepResult::NotFound,
+            Err(e) => StepResult::Skipped {
+                reason: format!("mDNS AAAA query failed: {e}"),
+            },
+        }
+    }
 }
 
 impl SourceResolver for SystemSourceResolver {
@@ -129,13 +141,8 @@ impl SourceResolver for SystemSourceResolver {
         match source {
             NssSource::Files => self.lookup_hosts(name),
             NssSource::Dns => self.lookup_dns(name),
-            // IPv6 mDNS (AAAA queries) still lands in a follow-up patch —
-            // the query builder above only asks QTYPE=A. IPv4 minimal/full
-            // variants both get the real one-shot probe.
             NssSource::Mdns4Minimal | NssSource::Mdns4 => Self::lookup_mdns(name),
-            NssSource::Mdns6Minimal | NssSource::Mdns6 => StepResult::Skipped {
-                reason: "mDNS AAAA (IPv6) probing not implemented yet".into(),
-            },
+            NssSource::Mdns6Minimal | NssSource::Mdns6 => Self::lookup_mdns6(name),
             NssSource::Myhostname => StepResult::Skipped {
                 reason: "myhostname probing not implemented in MVP".into(),
             },

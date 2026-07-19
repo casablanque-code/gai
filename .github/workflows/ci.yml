@@ -7,13 +7,21 @@ on:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
+      - "scripts/**"
+      - "deny.toml"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
+      - "scripts/**"
+      - "deny.toml"
       - ".github/workflows/ci.yml"
+  schedule:
+    # Catch newly-published RUSTSEC advisories against pinned deps even
+    # when nothing in the repo has changed.
+    - cron: "0 6 * * 1"
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,3 +41,20 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
         run: cargo test --workspace
+      - name: doc-test
+        run: cargo test --workspace --doc
+
+  release-guard-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify tag/version guard actually rejects a mismatch
+        run: bash scripts/check_tag_version_test.sh
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources

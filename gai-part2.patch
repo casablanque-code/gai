@@ -1,0 +1,641 @@
+diff --git a/.github/dependabot.yml b/.github/dependabot.yml
+new file mode 100644
+index 0000000..dd700fa
+--- /dev/null
++++ b/.github/dependabot.yml
+@@ -0,0 +1,12 @@
++version: 2
++updates:
++  - package-ecosystem: "cargo"
++    directory: "/"
++    schedule:
++      interval: "weekly"
++    open-pull-requests-limit: 10
++
++  - package-ecosystem: "github-actions"
++    directory: "/"
++    schedule:
++      interval: "weekly"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index b56ab64..1112744 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -7,13 +7,21 @@ on:
+       - "**/*.rs"
+       - "**/Cargo.toml"
+       - "Cargo.lock"
++      - "scripts/**"
++      - "deny.toml"
+       - ".github/workflows/ci.yml"
+   pull_request:
+     paths:
+       - "**/*.rs"
+       - "**/Cargo.toml"
+       - "Cargo.lock"
++      - "scripts/**"
++      - "deny.toml"
+       - ".github/workflows/ci.yml"
++  schedule:
++    # Catch newly-published RUSTSEC advisories against pinned deps even
++    # when nothing in the repo has changed.
++    - cron: "0 6 * * 1"
+ 
+ env:
+   CARGO_TERM_COLOR: always
+@@ -33,3 +41,20 @@ jobs:
+         run: cargo clippy --workspace --all-targets -- -D warnings
+       - name: test
+         run: cargo test --workspace
++      - name: doc-test
++        run: cargo test --workspace --doc
++
++  release-guard-selftest:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - name: verify tag/version guard actually rejects a mismatch
++        run: bash scripts/check_tag_version_test.sh
++
++  dependency-audit:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: EmbarkStudios/cargo-deny-action@v2
++        with:
++          command: check advisories bans licenses sources
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index e5bf58e..0fe2ba6 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -14,13 +14,7 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+       - name: tag must match Cargo.toml workspace version
+-        run: |
+-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+-          CARGO_VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+-          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+-            echo "::error::tag v${TAG_VERSION} does not match Cargo.toml version ${CARGO_VERSION}"
+-            exit 1
+-          fi
++        run: bash scripts/check_tag_version.sh "${GITHUB_REF_NAME}" Cargo.toml
+ 
+   publish:
+     needs: check-version
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index e954799..5ae11bb 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -19,13 +19,7 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+       - name: tag must match Cargo.toml workspace version
+-        run: |
+-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+-          CARGO_VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+-          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+-            echo "::error::tag v${TAG_VERSION} does not match Cargo.toml version ${CARGO_VERSION}"
+-            exit 1
+-          fi
++        run: bash scripts/check_tag_version.sh "${GITHUB_REF_NAME}" Cargo.toml
+ 
+   build:
+     needs: check-version
+diff --git a/deny.toml b/deny.toml
+new file mode 100644
+index 0000000..3c57861
+--- /dev/null
++++ b/deny.toml
+@@ -0,0 +1,28 @@
++[advisories]
++db-path = "~/.cargo/advisory-db"
++db-urls = ["https://github.com/rustsec/advisory-db"]
++yanked = "deny"
++
++[licenses]
++allow = [
++  "MIT",
++  "Apache-2.0",
++  "Apache-2.0 WITH LLVM-exception",
++  "BSD-2-Clause",
++  "BSD-3-Clause",
++  "ISC",
++  "Unicode-3.0",
++  "Zlib",
++]
++confidence-threshold = 0.8
++
++[bans]
++# Multiple versions of the same crate are common and mostly harmless in a
++# small workspace like this (transitive deps of clap/zbus/hickory each
++# pinning slightly different point releases) — not worth failing CI over
++# right now. Revisit if the tree grows.
++multiple-versions = "warn"
++
++[sources]
++unknown-registry = "deny"
++unknown-git = "deny"
+diff --git a/gai-probe/src/mdns.rs b/gai-probe/src/mdns.rs
+index 7cf4b1b..d06ddc1 100644
+--- a/gai-probe/src/mdns.rs
++++ b/gai-probe/src/mdns.rs
+@@ -1,20 +1,34 @@
+-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
++use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
+ use std::time::Duration;
+ 
+ const MDNS_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
+ const MDNS_PORT: u16 = 5353;
+ const QUERY_TIMEOUT: Duration = Duration::from_millis(500);
+ 
++const QTYPE_A: u16 = 1;
++const QTYPE_AAAA: u16 = 28;
++
+ /// Sends a single one-shot mDNS A-record query for `name` and collects
+ /// whatever A records come back within QUERY_TIMEOUT. This is not a full
+ /// mDNS responder — no continuous listening, no cache, no service
+ /// discovery — just enough to answer "does anything on the local network
+ /// claim this name" the way NSS's mdns4_minimal source would.
+ pub fn query_a_record(name: &str) -> anyhow::Result<Vec<IpAddr>> {
++    query_record(name, QTYPE_A)
++}
++
++/// Sends a single one-shot mDNS AAAA-record query for `name`, same
++/// one-shot semantics as `query_a_record` above but for IPv6 — this is
++/// what NSS's mdns6/mdns6_minimal sources do under the hood.
++pub fn query_aaaa_record(name: &str) -> anyhow::Result<Vec<IpAddr>> {
++    query_record(name, QTYPE_AAAA)
++}
++
++fn query_record(name: &str, qtype: u16) -> anyhow::Result<Vec<IpAddr>> {
+     let socket = UdpSocket::bind("0.0.0.0:0")?;
+     socket.set_read_timeout(Some(QUERY_TIMEOUT))?;
+ 
+-    let packet = build_query(name);
++    let packet = build_query(name, qtype);
+     socket.send_to(&packet, SocketAddr::from((MDNS_ADDR, MDNS_PORT)))?;
+ 
+     let mut addresses = Vec::new();
+@@ -24,7 +38,7 @@ pub fn query_a_record(name: &str) -> anyhow::Result<Vec<IpAddr>> {
+     while std::time::Instant::now() < deadline {
+         match socket.recv(&mut buf) {
+             Ok(len) => {
+-                if let Some(found) = parse_a_records(&buf[..len], name) {
++                if let Some(found) = parse_records(&buf[..len], name, qtype) {
+                     addresses.extend(found);
+                 }
+             }
+@@ -40,9 +54,10 @@ pub fn query_a_record(name: &str) -> anyhow::Result<Vec<IpAddr>> {
+ }
+ 
+ /// Builds a minimal DNS query packet: 12-byte header + one question for
+-/// `name` with QTYPE=A(1), QCLASS=IN(1). Same wire format as unicast DNS —
+-/// mDNS just runs it over multicast UDP on port 5353.
+-fn build_query(name: &str) -> Vec<u8> {
++/// `name` with the given QTYPE (A=1 or AAAA=28), QCLASS=IN(1). Same wire
++/// format as unicast DNS — mDNS just runs it over multicast UDP on port
++/// 5353.
++fn build_query(name: &str, qtype: u16) -> Vec<u8> {
+     let mut packet = Vec::with_capacity(32);
+     packet.extend_from_slice(&0x0000u16.to_be_bytes()); // transaction ID (0 for mDNS)
+     packet.extend_from_slice(&0x0000u16.to_be_bytes()); // flags: standard query
+@@ -59,16 +74,17 @@ fn build_query(name: &str) -> Vec<u8> {
+         packet.extend_from_slice(label.as_bytes());
+     }
+     packet.push(0x00); // root label
+-    packet.extend_from_slice(&0x0001u16.to_be_bytes()); // QTYPE A
++    packet.extend_from_slice(&qtype.to_be_bytes());
+     packet.extend_from_slice(&0x0001u16.to_be_bytes()); // QCLASS IN
+ 
+     packet
+ }
+ 
+-/// Extracts A-record addresses from a response, only if the question
+-/// name in the response matches what we asked for (best-effort — mDNS
+-/// responders on the segment may answer other queries too).
+-fn parse_a_records(data: &[u8], expected_name: &str) -> Option<Vec<IpAddr>> {
++/// Extracts A/AAAA-record addresses matching `qtype` from a response,
++/// only if the question name in the response matches what we asked for
++/// (best-effort — mDNS responders on the segment may answer other
++/// queries too).
++fn parse_records(data: &[u8], expected_name: &str, qtype: u16) -> Option<Vec<IpAddr>> {
+     if data.len() < 12 {
+         return None;
+     }
+@@ -98,17 +114,27 @@ fn parse_a_records(data: &[u8], expected_name: &str) -> Option<Vec<IpAddr>> {
+         if pos + rdlength > data.len() {
+             break;
+         }
+-        if rtype == 1 && rdlength == 4 {
++        if rtype == qtype {
+             let matches = decode_name(data, name_start)
+                 .map(|n| n.eq_ignore_ascii_case(expected_name))
+                 .unwrap_or(false);
+             if matches {
+-                addrs.push(IpAddr::V4(Ipv4Addr::new(
+-                    data[pos],
+-                    data[pos + 1],
+-                    data[pos + 2],
+-                    data[pos + 3],
+-                )));
++                match (qtype, rdlength) {
++                    (QTYPE_A, 4) => {
++                        addrs.push(IpAddr::V4(Ipv4Addr::new(
++                            data[pos],
++                            data[pos + 1],
++                            data[pos + 2],
++                            data[pos + 3],
++                        )));
++                    }
++                    (QTYPE_AAAA, 16) => {
++                        let mut octets = [0u8; 16];
++                        octets.copy_from_slice(&data[pos..pos + 16]);
++                        addrs.push(IpAddr::V6(Ipv6Addr::from(octets)));
++                    }
++                    _ => {} // rtype matched qtype but rdlength is malformed — skip
++                }
+             }
+         }
+         pos += rdlength;
+@@ -166,3 +192,147 @@ fn decode_name(data: &[u8], mut pos: usize) -> Option<String> {
+     }
+     Some(labels.join("."))
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// Appends a single A-record answer (with a name-compression pointer
++    /// back to offset 12, where the question name starts) to `packet`,
++    /// and returns the packet with header counts fixed up. This mirrors
++    /// what a real mDNS responder puts on the wire well enough to drive
++    /// `parse_records` through its real code path.
++    fn append_a_answer(mut packet: Vec<u8>, ip: [u8; 4]) -> Vec<u8> {
++        packet.extend_from_slice(&(0xC000u16 | 12).to_be_bytes()); // ptr to q-name
++        packet.extend_from_slice(&QTYPE_A.to_be_bytes());
++        packet.extend_from_slice(&1u16.to_be_bytes()); // CLASS IN
++        packet.extend_from_slice(&0u32.to_be_bytes()); // TTL
++        packet.extend_from_slice(&4u16.to_be_bytes()); // RDLENGTH
++        packet.extend_from_slice(&ip);
++        bump_ancount(packet)
++    }
++
++    fn append_aaaa_answer(mut packet: Vec<u8>, ip: [u8; 16]) -> Vec<u8> {
++        packet.extend_from_slice(&(0xC000u16 | 12).to_be_bytes()); // ptr to q-name
++        packet.extend_from_slice(&QTYPE_AAAA.to_be_bytes());
++        packet.extend_from_slice(&1u16.to_be_bytes()); // CLASS IN
++        packet.extend_from_slice(&0u32.to_be_bytes()); // TTL
++        packet.extend_from_slice(&16u16.to_be_bytes()); // RDLENGTH
++        packet.extend_from_slice(&ip);
++        bump_ancount(packet)
++    }
++
++    fn bump_ancount(mut packet: Vec<u8>) -> Vec<u8> {
++        let ancount = u16::from_be_bytes([packet[6], packet[7]]) + 1;
++        packet[6..8].copy_from_slice(&ancount.to_be_bytes());
++        packet
++    }
++
++    #[test]
++    fn build_query_encodes_labels_and_root_and_qtype_a() {
++        let packet = build_query("api.local", QTYPE_A);
++        assert_eq!(&packet[0..12], &[0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
++
++        let expected_question = b"\x03api\x05local\x00";
++        assert_eq!(&packet[12..12 + expected_question.len()], expected_question);
++        let after = 12 + expected_question.len();
++        assert_eq!(&packet[after..after + 2], &QTYPE_A.to_be_bytes());
++        assert_eq!(&packet[after + 2..after + 4], &1u16.to_be_bytes());
++    }
++
++    #[test]
++    fn build_query_uses_qtype_aaaa_when_requested() {
++        let packet = build_query("api.local", QTYPE_AAAA);
++        let expected_question = b"\x03api\x05local\x00";
++        let after = 12 + expected_question.len();
++        assert_eq!(&packet[after..after + 2], &QTYPE_AAAA.to_be_bytes());
++    }
++
++    #[test]
++    fn build_query_skips_empty_labels_from_trailing_dot() {
++        let packet = build_query("api.local.", QTYPE_A);
++        let expected_question = b"\x03api\x05local\x00";
++        assert_eq!(&packet[12..12 + expected_question.len()], expected_question);
++    }
++
++    #[test]
++    fn parse_records_extracts_matching_a_answer() {
++        let query = build_query("api.local", QTYPE_A);
++        let packet = append_a_answer(query, [192, 168, 1, 42]);
++
++        let addrs =
++            parse_records(&packet, "api.local", QTYPE_A).expect("should find a record");
++        assert_eq!(addrs, vec![IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))]);
++    }
++
++    #[test]
++    fn parse_records_extracts_matching_aaaa_answer() {
++        let query = build_query("api.local", QTYPE_AAAA);
++        let ip = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
++        let packet = append_aaaa_answer(query, ip.octets());
++
++        let addrs = parse_records(&packet, "api.local", QTYPE_AAAA)
++            .expect("should find an AAAA record");
++        assert_eq!(addrs, vec![IpAddr::V6(ip)]);
++    }
++
++    #[test]
++    fn parse_records_ignores_aaaa_answer_when_asking_for_a() {
++        // A responder that only has an AAAA record must not be reported
++        // as an answer to an A-type query, even though the name matches.
++        let query = build_query("api.local", QTYPE_A);
++        let ip = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
++        let packet = append_aaaa_answer(query, ip.octets());
++
++        assert!(parse_records(&packet, "api.local", QTYPE_A).is_none());
++    }
++
++    #[test]
++    fn parse_records_ignores_answer_for_a_different_name() {
++        let query = build_query("printer.local", QTYPE_A);
++        let packet = append_a_answer(query, [10, 0, 0, 5]);
++
++        let addrs = parse_records(&packet, "api.local", QTYPE_A);
++        assert!(addrs.is_none(), "must not report a match for the wrong name");
++    }
++
++    #[test]
++    fn parse_records_returns_none_with_zero_answers() {
++        let query = build_query("api.local", QTYPE_A); // ancount stays 0
++        assert!(parse_records(&query, "api.local", QTYPE_A).is_none());
++    }
++
++    #[test]
++    fn parse_records_returns_none_on_truncated_packet() {
++        let mut packet = append_a_answer(build_query("api.local", QTYPE_A), [1, 2, 3, 4]);
++        packet.truncate(packet.len() - 3); // cut off mid-rdata
++        assert!(parse_records(&packet, "api.local", QTYPE_A).is_none());
++    }
++
++    #[test]
++    fn skip_name_follows_compression_pointer_as_two_bytes() {
++        let data = [0xC0, 0x00, 0xAA];
++        let next = skip_name(&data, 0).expect("valid pointer");
++        assert_eq!(next, 2);
++    }
++
++    #[test]
++    fn skip_name_returns_none_on_truncated_label() {
++        let data = [5u8, b'a', b'b'];
++        assert!(skip_name(&data, 0).is_none());
++    }
++
++    #[test]
++    fn decode_name_reassembles_dotted_labels() {
++        let mut data = vec![0u8; 12];
++        data.extend_from_slice(b"\x03api\x05local\x00");
++        let name = decode_name(&data, 12).expect("decodes");
++        assert_eq!(name, "api.local");
++    }
++
++    #[test]
++    fn decode_name_guards_against_pointer_loops() {
++        let data = [0xC0, 0x00, 0xC0, 0x00];
++        assert!(decode_name(&data, 0).is_none());
++    }
++}
+diff --git a/gai-probe/src/resolver.rs b/gai-probe/src/resolver.rs
+index 077c213..0e05aa2 100644
+--- a/gai-probe/src/resolver.rs
++++ b/gai-probe/src/resolver.rs
+@@ -122,6 +122,18 @@ impl SystemSourceResolver {
+             },
+         }
+     }
++
++    /// Same as `lookup_mdns` but for AAAA (IPv6) records, backing
++    /// mdns6/mdns6_minimal.
++    fn lookup_mdns6(name: &str) -> StepResult {
++        match crate::mdns::query_aaaa_record(name) {
++            Ok(addrs) if !addrs.is_empty() => StepResult::Found(addrs),
++            Ok(_) => StepResult::NotFound,
++            Err(e) => StepResult::Skipped {
++                reason: format!("mDNS AAAA query failed: {e}"),
++            },
++        }
++    }
+ }
+ 
+ impl SourceResolver for SystemSourceResolver {
+@@ -129,13 +141,8 @@ impl SourceResolver for SystemSourceResolver {
+         match source {
+             NssSource::Files => self.lookup_hosts(name),
+             NssSource::Dns => self.lookup_dns(name),
+-            // IPv6 mDNS (AAAA queries) still lands in a follow-up patch —
+-            // the query builder above only asks QTYPE=A. IPv4 minimal/full
+-            // variants both get the real one-shot probe.
+             NssSource::Mdns4Minimal | NssSource::Mdns4 => Self::lookup_mdns(name),
+-            NssSource::Mdns6Minimal | NssSource::Mdns6 => StepResult::Skipped {
+-                reason: "mDNS AAAA (IPv6) probing not implemented yet".into(),
+-            },
++            NssSource::Mdns6Minimal | NssSource::Mdns6 => Self::lookup_mdns6(name),
+             NssSource::Myhostname => StepResult::Skipped {
+                 reason: "myhostname probing not implemented in MVP".into(),
+             },
+diff --git a/gai/Cargo.toml b/gai/Cargo.toml
+index 3aec3da..83e4393 100644
+--- a/gai/Cargo.toml
++++ b/gai/Cargo.toml
+@@ -19,3 +19,7 @@ gai-core = { path = "../gai-core", version = "0.1.3" }
+ gai-probe = { path = "../gai-probe", version = "0.1.3" }
+ anyhow.workspace = true
+ clap.workspace = true
++
++[dev-dependencies]
++assert_cmd = "2"
++predicates = "3"
+diff --git a/gai/tests/cli.rs b/gai/tests/cli.rs
+new file mode 100644
+index 0000000..eaab48a
+--- /dev/null
++++ b/gai/tests/cli.rs
+@@ -0,0 +1,101 @@
++//! CLI-level tests for the `gai` binary: argument parsing, subcommand
++//! dispatch, and exit codes. Deliberately does NOT try to fake
++//! /etc/nsswitch.conf, /etc/resolv.conf, or /etc/hosts (those paths are
++//! hardcoded in gai_core::platform::paths and aren't injectable) — this
++//! layer only checks that main.rs wires clap up correctly and that the
++//! commands run to completion against whatever real config CI's Linux
++//! runner has. Simulation logic itself is covered by gai-core's unit and
++//! scenario tests, which run against real parsed fixtures.
++
++use assert_cmd::Command;
++use predicates::prelude::*;
++
++fn gai() -> Command {
++    Command::cargo_bin("gai").expect("gai binary should build")
++}
++
++#[test]
++fn no_subcommand_fails_with_usage() {
++    gai()
++        .assert()
++        .failure()
++        .stderr(predicate::str::contains("Usage"));
++}
++
++#[test]
++fn help_lists_all_three_subcommands() {
++    gai()
++        .arg("--help")
++        .assert()
++        .success()
++        .stdout(predicate::str::contains("explain"))
++        .stdout(predicate::str::contains("doctor"))
++        .stdout(predicate::str::contains("why"));
++}
++
++#[test]
++fn version_flag_prints_a_version() {
++    gai()
++        .arg("--version")
++        .assert()
++        .success()
++        .stdout(predicate::str::contains("gai"));
++}
++
++#[test]
++fn explain_requires_a_name_argument() {
++    gai().arg("explain").assert().failure();
++}
++
++#[test]
++fn unknown_subcommand_is_rejected() {
++    gai()
++        .arg("frobnicate")
++        .arg("localhost")
++        .assert()
++        .failure();
++}
++
++#[test]
++fn explain_localhost_resolves_and_prints_the_chain() {
++    // localhost is virtually always present in /etc/hosts on any Linux
++    // box (including GitHub Actions runners), so this exercises the
++    // real Files source end-to-end without needing network access.
++    gai()
++        .arg("explain")
++        .arg("localhost")
++        .assert()
++        .success()
++        .stdout(predicate::str::contains("Resolution path"))
++        .stdout(predicate::str::contains("Result:"));
++}
++
++#[test]
++fn doctor_and_why_are_interchangeable_aliases() {
++    // Both should reach the same code path and produce a DIAGNOSIS
++    // section; doctor does live network I/O (DNS/mDNS reality check),
++    // so this only asserts it completes and shapes its output — not
++    // specific addresses, which would be flaky in CI.
++    let doctor_out = gai()
++        .arg("doctor")
++        .arg("localhost")
++        .assert()
++        .success()
++        .get_output()
++        .stdout
++        .clone();
++    let why_out = gai()
++        .arg("why")
++        .arg("localhost")
++        .assert()
++        .success()
++        .get_output()
++        .stdout
++        .clone();
++
++    let doctor_out = String::from_utf8(doctor_out).unwrap();
++    let why_out = String::from_utf8(why_out).unwrap();
++
++    assert!(doctor_out.contains("DIAGNOSIS:"));
++    assert!(why_out.contains("DIAGNOSIS:"));
++}
+diff --git a/scripts/check_tag_version.sh b/scripts/check_tag_version.sh
+new file mode 100755
+index 0000000..6f97616
+--- /dev/null
++++ b/scripts/check_tag_version.sh
+@@ -0,0 +1,21 @@
++#!/usr/bin/env bash
++# Fails if the pushed tag (vX.Y.Z) doesn't match the workspace version in
++# Cargo.toml. Shared by release.yml and publish.yml so there's exactly one
++# place this comparison lives — and one place to unit-test it (see
++# check_tag_version_test.sh).
++#
++# Usage: check_tag_version.sh <tag-ref-name> <path-to-workspace-Cargo.toml>
++set -euo pipefail
++
++tag_ref="${1:?usage: check_tag_version.sh <tag-ref-name> <cargo-toml-path>}"
++cargo_toml="${2:?usage: check_tag_version.sh <tag-ref-name> <cargo-toml-path>}"
++
++tag_version="${tag_ref#v}"
++cargo_version="$(grep -m1 '^version' "$cargo_toml" | sed -E 's/version = "(.*)"/\1/')"
++
++if [ "$tag_version" != "$cargo_version" ]; then
++  echo "::error::tag v${tag_version} does not match Cargo.toml version ${cargo_version}"
++  exit 1
++fi
++
++echo "OK: tag v${tag_version} matches Cargo.toml version ${cargo_version}"
+diff --git a/scripts/check_tag_version_test.sh b/scripts/check_tag_version_test.sh
+new file mode 100755
+index 0000000..e8f5421
+--- /dev/null
++++ b/scripts/check_tag_version_test.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# Unit test for check_tag_version.sh. Runs on every push/PR via ci.yml —
++# this is the piece that was never actually verified to fail on a
++# mismatched tag/version (only the success path had been exercised).
++set -euo pipefail
++
++script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++guard="$script_dir/check_tag_version.sh"
++
++fixture="$(mktemp -d)"
++trap 'rm -rf "$fixture"' EXIT
++
++cat > "$fixture/Cargo.toml" <<'EOF'
++[workspace.package]
++version = "1.2.3"
++EOF
++
++pass=0
++
++echo "case 1: matching tag/version must succeed"
++if "$guard" "v1.2.3" "$fixture/Cargo.toml"; then
++  echo "  ok"
++else
++  echo "  FAIL: expected success for matching version"
++  pass=1
++fi
++
++echo "case 2: mismatched tag/version must fail"
++if "$guard" "v9.9.9" "$fixture/Cargo.toml" 2>/dev/null; then
++  echo "  FAIL: expected failure for mismatched version, but guard succeeded"
++  pass=1
++else
++  echo "  ok (guard correctly rejected the mismatch)"
++fi
++
++echo "case 3: a partial/short version tag must be rejected"
++if "$guard" "v1.2" "$fixture/Cargo.toml" 2>/dev/null; then
++  echo "  FAIL: expected failure for an incomplete version tag"
++  pass=1
++else
++  echo "  ok"
++fi
++
++exit "$pass"

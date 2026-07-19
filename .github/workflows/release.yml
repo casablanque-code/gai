@@ -19,13 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: tag must match Cargo.toml workspace version
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          CARGO_VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
-          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
-            echo "::error::tag v${TAG_VERSION} does not match Cargo.toml version ${CARGO_VERSION}"
-            exit 1
-          fi
+        run: bash scripts/check_tag_version.sh "${GITHUB_REF_NAME}" Cargo.toml
 
   build:
     needs: check-version
