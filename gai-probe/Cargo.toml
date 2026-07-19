@@ -23,4 +23,4 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"]
 # per-link nameservers that actually back the 127.0.0.53 stub in
 # resolv.conf. Blocking API is fine here — gai is a short-lived CLI, not
 # a daemon.
-zbus = "4"
+zbus = "5"
