@@ -16,7 +16,7 @@ homepage = "https://github.com/casablanque-code/gai"
 readme = "README.md"
 
 [workspace.dependencies]
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
