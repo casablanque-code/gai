@@ -49,11 +49,7 @@ fn explain_requires_a_name_argument() {
 
 #[test]
 fn unknown_subcommand_is_rejected() {
-    gai()
-        .arg("frobnicate")
-        .arg("localhost")
-        .assert()
-        .failure();
+    gai().arg("frobnicate").arg("localhost").assert().failure();
 }
 
 #[test]

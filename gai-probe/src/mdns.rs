@@ -260,8 +260,7 @@ mod tests {
         let query = build_query("api.local", QTYPE_A);
         let packet = append_a_answer(query, [192, 168, 1, 42]);
 
-        let addrs =
-            parse_records(&packet, "api.local", QTYPE_A).expect("should find a record");
+        let addrs = parse_records(&packet, "api.local", QTYPE_A).expect("should find a record");
         assert_eq!(addrs, vec![IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))]);
     }
 
@@ -271,8 +270,8 @@ mod tests {
         let ip = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
         let packet = append_aaaa_answer(query, ip.octets());
 
-        let addrs = parse_records(&packet, "api.local", QTYPE_AAAA)
-            .expect("should find an AAAA record");
+        let addrs =
+            parse_records(&packet, "api.local", QTYPE_AAAA).expect("should find an AAAA record");
         assert_eq!(addrs, vec![IpAddr::V6(ip)]);
     }
 
@@ -293,7 +292,10 @@ mod tests {
         let packet = append_a_answer(query, [10, 0, 0, 5]);
 
         let addrs = parse_records(&packet, "api.local", QTYPE_A);
-        assert!(addrs.is_none(), "must not report a match for the wrong name");
+        assert!(
+            addrs.is_none(),
+            "must not report a match for the wrong name"
+        );
     }
 
     #[test]
