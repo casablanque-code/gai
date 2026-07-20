@@ -6,6 +6,30 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-20
+### Added
+- IPv6 mDNS (AAAA) probing — `mdns6`/`mdns6_minimal` NSS sources are now
+  actually queried instead of being skipped as unimplemented.
+- `gai-probe`: unit tests for mDNS packet building/parsing (`build_query`,
+  `parse_records`, name compression, pointer-loop guard), covering both
+  A and AAAA records and cross-type mismatch handling.
+- `gai`: CLI-level integration tests (`assert_cmd`) for argument parsing,
+  subcommand dispatch, and `explain`/`doctor`/`why` behavior.
+- `.github/dependabot.yml` (cargo + github-actions, weekly) and
+  `deny.toml` + a `dependency-audit` CI job (advisories/bans/licenses/
+  sources via cargo-deny), with a weekly cron so newly-published RUSTSEC
+  advisories are caught even without a push.
+- `scripts/check_tag_version.sh` + `scripts/check_tag_version_test.sh` —
+  the release tag/version guard is now a standalone, unit-tested script
+  instead of untested inline workflow logic.
+### Changed
+- `hickory-resolver` 0.24 → 0.26.1 (fixes RUSTSEC-2026-0119, an O(n²)
+  CPU-exhaustion DoS in `hickory-proto`'s message encoding). This is a
+  breaking upstream API change — 0.26 dropped the blocking `Resolver` in
+  favor of an async-only one; `resolver.rs` and `reality.rs` now bridge
+  it with a short-lived current-thread tokio runtime per query, keeping
+  `SourceResolver::resolve`'s synchronous signature intact.
+
 ## [0.1.5] - 2026-07-15
 ### Docs
 - `gai-core`: full field/variant-level rustdoc for every public type in
