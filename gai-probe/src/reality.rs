@@ -30,10 +30,8 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
     // independent signal — with hosts-file lookup left on, a Files-based
     // resolution and this "independent" check would agree by
     // construction, masking the exact discrepancy gai exists to find.
-    let opts = ResolverOpts {
-        use_hosts_file: ResolveHosts::Never,
-        ..ResolverOpts::default()
-    };
+    let mut opts = ResolverOpts::default();
+    opts.use_hosts_file = ResolveHosts::Never;
 
     // hickory-resolver 0.26+ is async-only (see resolver.rs::query for
     // the full rationale — this crate stays sync-first on purpose, so we

@@ -79,10 +79,8 @@ impl SystemSourceResolver {
         // "dns" source would silently double as a Files lookup, which is
         // exactly the layering confusion gai exists to expose. Disabled
         // so this function is a pure, wire-level DNS query.
-        let opts = ResolverOpts {
-            use_hosts_file: ResolveHosts::Never,
-            ..ResolverOpts::default()
-        };
+        let mut opts = ResolverOpts::default();
+        opts.use_hosts_file = ResolveHosts::Never;
 
         // hickory-resolver 0.26 dropped the blocking `Resolver` — it's
         // tokio-async only now (this is also the version bump that fixes
