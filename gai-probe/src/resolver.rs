@@ -1,6 +1,8 @@
 use gai_core::sim::SourceResolver;
 use gai_core::types::{HostsEntry, NssSource, StepResult};
-use hickory_resolver::config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts};
+use hickory_resolver::config::{NameServerConfig, ResolveHosts, ResolverConfig, ResolverOpts};
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::proto::xfer::Protocol;
 use hickory_resolver::Resolver;
 use std::net::{IpAddr, SocketAddr};
 
@@ -78,9 +80,33 @@ impl SystemSourceResolver {
         // exactly the layering confusion gai exists to expose. Disabled
         // so this function is a pure, wire-level DNS query.
         let mut opts = ResolverOpts::default();
-        opts.use_hosts_file = false;
-        match Resolver::new(cfg, opts) {
-            Ok(resolver) => match resolver.lookup_ip(name) {
+        opts.use_hosts_file = ResolveHosts::Never;
+
+        // hickory-resolver 0.26 dropped the blocking `Resolver` — it's
+        // tokio-async only now (this is also the version bump that fixes
+        // RUSTSEC-2026-0119's O(n^2) message-encoding DoS in
+        // hickory-proto 0.24.x). SourceResolver::resolve is a sync trait
+        // method by design (it's called from gai-core's plain simulation
+        // loop), so we bridge with a short-lived current-thread runtime
+        // rather than making the whole crate async for what's a couple
+        // of one-shot queries per CLI invocation.
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                return StepResult::Skipped {
+                    reason: format!("failed to start async runtime: {e}"),
+                }
+            }
+        };
+
+        rt.block_on(async {
+            let resolver = Resolver::builder_with_config(cfg, TokioConnectionProvider::default())
+                .with_options(opts)
+                .build();
+            match resolver.lookup_ip(name).await {
                 Ok(lookup) => {
                     let addrs: Vec<IpAddr> = lookup.iter().collect();
                     if addrs.is_empty() {
@@ -90,11 +116,8 @@ impl SystemSourceResolver {
                     }
                 }
                 Err(_) => StepResult::NotFound,
-            },
-            Err(e) => StepResult::Skipped {
-                reason: format!("resolver init failed: {e}"),
-            },
-        }
+            }
+        })
     }
 
     fn lookup_dns(&self, name: &str) -> StepResult {

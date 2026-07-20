@@ -17,7 +17,11 @@ anyhow.workspace = true
 # hickory-resolver: does raw DNS queries against a *given* server, bypassing
 # NSS entirely. This is how we get an independent "reality" answer instead
 # of trusting whatever the simulated chain produced.
-hickory-resolver = "0.24"
+# Pinned >=0.26.1: 0.24.x/0.25.x pull hickory-proto versions affected by
+# RUSTSEC-2026-0119 (O(n^2) CPU exhaustion in message-encoding name
+# compression). 0.26 also dropped the blocking Resolver API in favor of
+# an async-only one — see resolver.rs::query for the bridge.
+hickory-resolver = "0.26.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 # zbus: talks to org.freedesktop.resolve1 over the system D-Bus to get the
 # per-link nameservers that actually back the 127.0.0.53 stub in

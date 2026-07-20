@@ -1,4 +1,6 @@
-use hickory_resolver::config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts};
+use hickory_resolver::config::{NameServerConfig, ResolveHosts, ResolverConfig, ResolverOpts};
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::proto::xfer::Protocol;
 use hickory_resolver::Resolver;
 use std::net::{IpAddr, SocketAddr};
 
@@ -29,12 +31,24 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
     // resolution and this "independent" check would agree by
     // construction, masking the exact discrepancy gai exists to find.
     let mut opts = ResolverOpts::default();
-    opts.use_hosts_file = false;
-    let resolver = Resolver::new(cfg, opts)?;
-    let addresses = match resolver.lookup_ip(name) {
-        Ok(lookup) => lookup.iter().collect(),
-        Err(_) => Vec::new(),
-    };
+    opts.use_hosts_file = ResolveHosts::Never;
+
+    // hickory-resolver 0.26+ is async-only (see resolver.rs::query for
+    // the full rationale — this crate stays sync-first on purpose, so we
+    // bridge with a short-lived current-thread runtime here too).
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    let addresses = rt.block_on(async {
+        let resolver = Resolver::builder_with_config(cfg, TokioConnectionProvider::default())
+            .with_options(opts)
+            .build();
+        match resolver.lookup_ip(name).await {
+            Ok(lookup) => lookup.iter().collect(),
+            Err(_) => Vec::new(),
+        }
+    });
 
     Ok(RealityCheck {
         queried_servers: servers.to_vec(),
