@@ -7,7 +7,7 @@ versioning follows [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ## [0.2.1] - 2026-07-20
-### Fix readme publish on crates.io
+### Fix and add readme publish on crates.io
 
 ## [0.2.0] - 2026-07-20
 ### Added
