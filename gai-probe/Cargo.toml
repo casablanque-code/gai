@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
 description = "Real I/O backing gai-core's simulation: DNS queries, /etc/hosts, systemd-resolved D-Bus, one-shot mDNS probing. No process interception."
 keywords = ["dns", "systemd-resolved", "mdns", "getaddrinfo", "networking"]
 categories = ["network-programming"]

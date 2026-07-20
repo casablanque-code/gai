@@ -6,6 +6,9 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-20
+### Fix readme publish on crates.io
+
 ## [0.2.0] - 2026-07-20
 ### Added
 - IPv6 mDNS (AAAA) probing — `mdns6`/`mdns6_minimal` NSS sources are now

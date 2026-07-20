@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
 description = "Pure parsing + simulation of Linux name-resolution config (nsswitch.conf, resolv.conf, gai.conf, hosts) — no I/O. Core of the gai CLI."
 keywords = ["dns", "nsswitch", "resolv-conf", "getaddrinfo", "networking"]
 categories = ["network-programming", "parser-implementations"]

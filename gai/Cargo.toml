@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
 description = "gai — getaddrinfo inspector. Explains how a name turns into an IP: nsswitch, resolv.conf, systemd-resolved, mDNS, and where it disagrees with a direct DNS query. `cargo install gai-inspector` installs the `gai` binary."
 keywords = ["dns", "cli", "getaddrinfo", "nsswitch", "diagnostics"]
 categories = ["command-line-utilities", "network-programming"]
