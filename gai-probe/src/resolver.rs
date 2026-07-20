@@ -1,10 +1,9 @@
 use gai_core::sim::SourceResolver;
 use gai_core::types::{HostsEntry, NssSource, StepResult};
 use hickory_resolver::config::{NameServerConfig, ResolveHosts, ResolverConfig, ResolverOpts};
-use hickory_resolver::name_server::TokioConnectionProvider;
-use hickory_resolver::proto::xfer::Protocol;
+use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::Resolver;
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
 /// Answers each NSS source the way the real OS would, for a system that
 /// isn't running systemd-resolved (resolv.conf has real nameservers, not
@@ -67,20 +66,23 @@ impl SystemSourceResolver {
                 reason: "no nameservers configured".into(),
             };
         }
-        let mut cfg = ResolverConfig::new();
-        for ns in servers {
-            cfg.add_name_server(NameServerConfig::new(
-                SocketAddr::new(*ns, 53),
-                Protocol::Udp,
-            ));
-        }
+        let cfg = ResolverConfig::from_parts(
+            None,
+            vec![],
+            servers
+                .iter()
+                .map(|ip| NameServerConfig::udp(*ip))
+                .collect(),
+        );
         // Critical: hickory-resolver consults /etc/hosts by default even
         // with an explicit remote-only ResolverConfig. Left enabled, this
         // "dns" source would silently double as a Files lookup, which is
         // exactly the layering confusion gai exists to expose. Disabled
         // so this function is a pure, wire-level DNS query.
-        let mut opts = ResolverOpts::default();
-        opts.use_hosts_file = ResolveHosts::Never;
+        let opts = ResolverOpts {
+            use_hosts_file: ResolveHosts::Never,
+            ..ResolverOpts::default()
+        };
 
         // hickory-resolver 0.26 dropped the blocking `Resolver` — it's
         // tokio-async only now (this is also the version bump that fixes
@@ -103,9 +105,17 @@ impl SystemSourceResolver {
         };
 
         rt.block_on(async {
-            let resolver = Resolver::builder_with_config(cfg, TokioConnectionProvider::default())
+            let resolver = match Resolver::builder_with_config(cfg, TokioRuntimeProvider::default())
                 .with_options(opts)
-                .build();
+                .build()
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    return StepResult::Skipped {
+                        reason: format!("resolver init failed: {e}"),
+                    }
+                }
+            };
             match resolver.lookup_ip(name).await {
                 Ok(lookup) => {
                     let addrs: Vec<IpAddr> = lookup.iter().collect();

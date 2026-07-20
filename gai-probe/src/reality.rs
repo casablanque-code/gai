@@ -1,8 +1,7 @@
 use hickory_resolver::config::{NameServerConfig, ResolveHosts, ResolverConfig, ResolverOpts};
-use hickory_resolver::name_server::TokioConnectionProvider;
-use hickory_resolver::proto::xfer::Protocol;
+use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::Resolver;
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
 /// Result of an independent, out-of-band DNS query used purely as a
 /// sanity check against the simulated nsswitch outcome.
@@ -17,21 +16,24 @@ pub struct RealityCheck {
 }
 
 pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
-    let mut cfg = ResolverConfig::new();
-    for ns in servers {
-        cfg.add_name_server(NameServerConfig::new(
-            SocketAddr::new(*ns, 53),
-            Protocol::Udp,
-        ));
-    }
+    let cfg = ResolverConfig::from_parts(
+        None,
+        vec![],
+        servers
+            .iter()
+            .map(|ip| NameServerConfig::udp(*ip))
+            .collect(),
+    );
     // Same rationale as SystemSourceResolver::query: hickory-resolver
     // reads /etc/hosts by default regardless of an explicit remote
     // ResolverConfig. The whole point of a reality check is to be an
     // independent signal — with hosts-file lookup left on, a Files-based
     // resolution and this "independent" check would agree by
     // construction, masking the exact discrepancy gai exists to find.
-    let mut opts = ResolverOpts::default();
-    opts.use_hosts_file = ResolveHosts::Never;
+    let opts = ResolverOpts {
+        use_hosts_file: ResolveHosts::Never,
+        ..ResolverOpts::default()
+    };
 
     // hickory-resolver 0.26+ is async-only (see resolver.rs::query for
     // the full rationale — this crate stays sync-first on purpose, so we
@@ -41,14 +43,14 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
         .build()?;
 
     let addresses = rt.block_on(async {
-        let resolver = Resolver::builder_with_config(cfg, TokioConnectionProvider::default())
+        let resolver = Resolver::builder_with_config(cfg, TokioRuntimeProvider::default())
             .with_options(opts)
-            .build();
-        match resolver.lookup_ip(name).await {
+            .build()?;
+        anyhow::Ok(match resolver.lookup_ip(name).await {
             Ok(lookup) => lookup.iter().collect(),
             Err(_) => Vec::new(),
-        }
-    });
+        })
+    })?;
 
     Ok(RealityCheck {
         queried_servers: servers.to_vec(),
