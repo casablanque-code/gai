@@ -123,7 +123,21 @@ impl SystemSourceResolver {
                         StepResult::Found(addrs)
                     }
                 }
-                Err(_) => StepResult::NotFound,
+                // A query error (timeout, refused, network unreachable,
+                // ...) is not the same fact as an authoritative NXDOMAIN,
+                // and diagnosis logic downstream treats them very
+                // differently: `NotFound` is read as "DNS was asked and
+                // has no answer", while an error means DNS was never
+                // successfully asked at all. Collapsing the two here
+                // previously caused doctor to falsely diagnose "the OS
+                // chain disagrees with DNS reality" (or, symmetrically,
+                // "no discrepancy") on a plain timeout/flaky query rather
+                // than surfacing that the check itself didn't run. Mirrors
+                // how lookup_mdns/lookup_mdns6 already handle their own
+                // query errors below.
+                Err(e) => StepResult::Skipped {
+                    reason: format!("DNS query failed: {e}"),
+                },
             }
         })
     }
