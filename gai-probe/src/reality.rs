@@ -44,10 +44,18 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
         let resolver = Resolver::builder_with_config(cfg, TokioRuntimeProvider::default())
             .with_options(opts)
             .build()?;
-        anyhow::Ok(match resolver.lookup_ip(name).await {
-            Ok(lookup) => lookup.iter().collect(),
-            Err(_) => Vec::new(),
-        })
+        // Same reasoning as SystemSourceResolver::query: a query error
+        // (timeout, refused, ...) must not collapse into "found nothing",
+        // since callers treat an empty reality check as an authoritative
+        // "DNS confirms this name doesn't exist" — a very different claim
+        // from "the check itself failed to run". Propagate instead, so
+        // `doctor` sees `reality::check(..).ok()` come back `None` and
+        // reports "no reality check was possible" rather than a false
+        // agreement or a false discrepancy.
+        match resolver.lookup_ip(name).await {
+            Ok(lookup) => anyhow::Ok(lookup.iter().collect()),
+            Err(e) => Err(anyhow::anyhow!("DNS query failed: {e}")),
+        }
     })?;
 
     Ok(RealityCheck {
