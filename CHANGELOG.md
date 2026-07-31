@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-07-31
+### Added
+- `explain`/`doctor`: colored, boxed CLI output. Each resolution step now
+  gets a FOUND/NOT FOUND/SKIPPED tag (green/dim/red), and the final
+  verdict is shown in a bordered panel color-accented by severity — green
+  for no issue, yellow for informational only (anycast variance, couldn't
+  cross-check), red for something worth investigating. `doctor`'s panel
+  title doubles as a one-word verdict (OK/NOTE/ISSUE). Auto-disables for
+  non-terminal output (pipes, redirects) or when `NO_COLOR` is set, so
+  scripting against `gai`'s output is unaffected.
+
+### Fixed
+- Output panel borders (top/content/bottom) didn't agree on width, so
+  boxes rendered visibly lopsided — the bottom border came out 2 columns
+  wider than the top.
+
 ## [0.3.1] - 2026-07-31
 ### Fixed
 - `doctor`/`explain`: a DNS query error (timeout, SERVFAIL, ...) was
