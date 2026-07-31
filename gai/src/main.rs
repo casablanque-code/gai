@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 mod doctor;
 mod explain;
+mod style;
 
 #[derive(Parser)]
 #[command(
