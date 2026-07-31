@@ -16,8 +16,8 @@ name = "gai"
 path = "src/main.rs"
 
 [dependencies]
-gai-core = { path = "../gai-core", version = "0.3.1" }
-gai-probe = { path = "../gai-probe", version = "0.3.1" }
+gai-core = { path = "../gai-core", version = "0.4.0" }
+gai-probe = { path = "../gai-probe", version = "0.4.0" }
 anyhow.workspace = true
 clap.workspace = true
 

@@ -12,7 +12,7 @@ keywords = ["dns", "systemd-resolved", "mdns", "getaddrinfo", "networking"]
 categories = ["network-programming"]
 
 [dependencies]
-gai-core = { path = "../gai-core", version = "0.3.1" }
+gai-core = { path = "../gai-core", version = "0.4.0" }
 thiserror.workspace = true
 anyhow.workspace = true
 # hickory-resolver: does raw DNS queries against a *given* server, bypassing
