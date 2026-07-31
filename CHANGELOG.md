@@ -4,7 +4,18 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-07-31
+### Fixed
+- `doctor`/`explain`: a transient DNS query error (timeout, refused, ...) was
+  being silently treated as an authoritative NXDOMAIN instead of surfacing as
+  "the check couldn't run" — could cause `doctor` to falsely report a resolved
+  name as failing, or falsely agree/disagree with DNS reality.
+- `doctor`: resolved addresses were compared as ordered lists, causing a false
+  "disagreement" diagnosis whenever DNS and the OS chain returned the same
+  address set in a different order (e.g. `localhost`).
+- `doctor`: diagnosis no longer blames files/mdns for a mismatch when the
+  simulated chain's own answer came from DNS itself (more likely anycast/
+  GeoDNS variance between two separate queries).
 
 ## [0.2.1] - 2026-07-20
 ### Fix and add readme publish on crates.io
