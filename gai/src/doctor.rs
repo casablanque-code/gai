@@ -123,8 +123,10 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             match &reality_result {
                 None => (
                     YELLOW,
-                    vec!["Resolution failed and no nameservers were configured to cross-check."
-                        .to_string()],
+                    vec![
+                        "Resolution failed and no nameservers were configured to cross-check."
+                            .to_string(),
+                    ],
                 ),
                 Some(reality) if reality.addresses.is_empty() => (
                     GREEN,
@@ -158,8 +160,10 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             ),
             Some(reality) if same_address_set(&reality.addresses, &outcome.final_addresses) => (
                 GREEN,
-                vec!["Resolution succeeded and matches direct DNS. No discrepancy found."
-                    .to_string()],
+                vec![
+                    "Resolution succeeded and matches direct DNS. No discrepancy found."
+                        .to_string(),
+                ],
             ),
             Some(reality)
                 if outcome

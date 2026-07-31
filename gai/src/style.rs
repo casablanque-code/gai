@@ -82,10 +82,15 @@ const PANEL_WIDTH: usize = 74;
 pub fn panel(style: &Style, title: &str, body: &[String], accent: &str) {
     let top = format!("┌─ {title} ");
     let dashes = PANEL_WIDTH.saturating_sub(top.chars().count() + 1);
-    println!("  {}", style.accent(accent, &format!("{top}{}┐", "─".repeat(dashes))));
+    println!(
+        "  {}",
+        style.accent(accent, &format!("{top}{}┐", "─".repeat(dashes)))
+    );
     for line in body {
         for wrapped in wrap(line, PANEL_WIDTH.saturating_sub(4)) {
-            let pad = PANEL_WIDTH.saturating_sub(2).saturating_sub(wrapped.chars().count());
+            let pad = PANEL_WIDTH
+                .saturating_sub(2)
+                .saturating_sub(wrapped.chars().count());
             println!(
                 "  {} {}{} {}",
                 style.accent(accent, "│"),
