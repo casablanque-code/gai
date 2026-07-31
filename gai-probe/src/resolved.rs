@@ -64,10 +64,47 @@ fn decode_address(family: i32, bytes: &[u8]) -> Option<IpAddr> {
 }
 
 /// Convenience: flat list of unique addresses, ignoring which link they
-/// came from. Good enough for the reality-check query; per-link
-/// split-DNS accuracy is a follow-up, not MVP.
+/// came from. Kept for callers that genuinely want every configured
+/// server regardless of scope; general-purpose queries should use
+/// [`effective_addresses`] instead — see its doc comment for why.
 pub fn flat_addresses(entries: &[ResolvedNameserver]) -> Vec<IpAddr> {
     let mut addrs: Vec<IpAddr> = entries.iter().map(|e| e.address).collect();
+    addrs.sort();
+    addrs.dedup();
+    addrs
+}
+
+/// Nameservers to use for an ordinary, unscoped name query (the plain
+/// `dns` NSS source, and the reality check).
+///
+/// systemd-resolved's Manager.DNS property mixes two different kinds of
+/// entry: global-scope servers (ifindex 0, set via `resolv.conf`/global
+/// `DNS=`) meant for any name, and per-link servers meant only for names
+/// under that link's routing domains (e.g. a VPN's split-DNS resolver,
+/// which answers its own private zone and SERVFAILs — not NXDOMAINs —
+/// anything else). `flat_addresses` throws that distinction away and
+/// pools both kinds together, so a link-scoped resolver ends up being
+/// asked about public internet names it was never meant to answer.
+///
+/// This is a partial fix, not full split-DNS: it doesn't route a name to
+/// the specific link whose domain it matches (that needs the Domains
+/// property too, and is a real follow-up — see the split-DNS gap noted
+/// elsewhere). It does stop link-scoped-only resolvers from being queried
+/// for names outside their scope by default, which is the failure mode
+/// this function exists to avoid: prefer global-scope servers, and only
+/// fall back to the full unscoped pool if no global-scope server was
+/// reported at all (e.g. a system with only per-link DNS configured).
+pub fn effective_addresses(entries: &[ResolvedNameserver]) -> Vec<IpAddr> {
+    let global: Vec<IpAddr> = entries
+        .iter()
+        .filter(|e| e.ifindex == 0)
+        .map(|e| e.address)
+        .collect();
+    let mut addrs = if global.is_empty() {
+        entries.iter().map(|e| e.address).collect()
+    } else {
+        global
+    };
     addrs.sort();
     addrs.dedup();
     addrs

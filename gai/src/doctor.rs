@@ -1,7 +1,7 @@
 use gai_core::config::{parse_hosts, parse_nsswitch, parse_resolv_conf};
 use gai_core::platform::paths;
 use gai_core::sim::simulate;
-use gai_probe::resolved::flat_addresses;
+use gai_probe::resolved::effective_addresses;
 use gai_probe::{query_nameservers, reality, SystemSourceResolver};
 use std::net::IpAddr;
 use std::path::Path;
@@ -23,7 +23,7 @@ pub fn run(name: &str) -> anyhow::Result<()> {
     let nss = parse_nsswitch(Path::new(paths::NSSWITCH_CONF))?;
     let resolv = parse_resolv_conf(Path::new(paths::RESOLV_CONF))?;
     let hosts = parse_hosts(Path::new(paths::HOSTS))?;
-    let resolved_servers = flat_addresses(&query_nameservers().unwrap_or_default());
+    let resolved_servers = effective_addresses(&query_nameservers().unwrap_or_default());
 
     println!("[gai] Simulating name resolution for \"{name}\"...\n");
 
