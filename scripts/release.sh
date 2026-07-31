@@ -43,14 +43,30 @@ sed -i.bak -E "0,/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/s//version = \"${NEW_VER
 rm -f Cargo.toml.bak
 
 # Internal path-dependency pins (gai-probe -> gai-core, gai -> gai-core/gai-probe)
-# aren't workspace-inherited and don't get touched by the substitution above —
+# aren't workspace-inherited and don't get touched by the substitution above --
 # this is what let v0.2.0's crates.io publish nearly break (stale "0.1.3" pins
-# didn't satisfy the newly-published 0.2.0). Bump every literal occurrence of
-# the old version string across the member manifests too.
+# didn't satisfy the newly-published 0.2.0). Bump every such pin to
+# NEW_VERSION directly, regardless of what version it currently names --
+# matching only OLD_VERSION here is exactly how these pins silently drifted
+# to "0.2.0" and stayed there through the 0.2.0 -> 0.2.1 release, which is
+# what broke this script's next run (0.2.1 -> 0.3.0) with a cargo resolver
+# error instead of a caught, actionable failure.
 for member_toml in gai-core/Cargo.toml gai-probe/Cargo.toml gai/Cargo.toml; do
-  sed -i.bak -E "s/version = \"${OLD_VERSION}\"/version = \"${NEW_VERSION}\"/g" "$member_toml"
+  sed -i.bak -E \
+    "s#(gai-(core|probe) = \{ path = \"\.\./gai-(core|probe)\", version = \")[^\"]*(\")#\1${NEW_VERSION}\4#g" \
+    "$member_toml"
   rm -f "${member_toml}.bak"
 done
+
+# Hard-verify no internal pin was left pointing at anything but NEW_VERSION --
+# the whole point of the bump above is that this can never again silently
+# no-op the way the OLD_VERSION-only match did.
+if grep -rn -E 'gai-(core|probe) = \{ path = "\.\./gai-(core|probe)", version = "[^"]*"' \
+     gai-core/Cargo.toml gai-probe/Cargo.toml gai/Cargo.toml \
+   | grep -v "version = \"${NEW_VERSION}\""; then
+  echo "error: an internal path-dependency pin above still doesn't read \"${NEW_VERSION}\" -- aborting before tag/push" >&2
+  exit 1
+fi
 
 # Hard-verify the bump actually landed before doing anything irreversible.
 # Silent no-op failures here are exactly how v0.2.1 got tagged with
