@@ -73,22 +73,30 @@ pub fn format_addrs(addrs: &[IpAddr]) -> String {
     }
 }
 
-const PANEL_WIDTH: usize = 74;
+const PANEL_WIDTH: usize = 76;
+/// Width of the space between the two vertical border characters — what
+/// top/content/bottom borders all have to agree on for the box to line
+/// up. Previously the top border measured its dashes against PANEL_WIDTH
+/// while the bottom border added PANEL_WIDTH dashes *plus* its own two
+/// corner characters, and content rows were padded to match the bottom
+/// rather than the top — so the bottom (and every content row) came out
+/// two columns wider than the top.
+const INTERIOR: usize = PANEL_WIDTH - 2;
 
 /// A titled, color-accented box around one or more lines of text,
 /// word-wrapped to fit. `accent` is one of the SGR codes above (or any
 /// raw code) and both colors the border and hints severity — green for
 /// "no issue", yellow for "informational", red for "worth a look".
 pub fn panel(style: &Style, title: &str, body: &[String], accent: &str) {
-    let top = format!("┌─ {title} ");
-    let dashes = PANEL_WIDTH.saturating_sub(top.chars().count() + 1);
+    let prefix = format!("─ {title} ");
+    let dashes = INTERIOR.saturating_sub(prefix.chars().count());
     println!(
         "  {}",
-        style.accent(accent, &format!("{top}{}┐", "─".repeat(dashes)))
+        style.accent(accent, &format!("┌{prefix}{}┐", "─".repeat(dashes)))
     );
     for line in body {
-        for wrapped in wrap(line, PANEL_WIDTH.saturating_sub(4)) {
-            let pad = PANEL_WIDTH
+        for wrapped in wrap(line, INTERIOR.saturating_sub(2)) {
+            let pad = INTERIOR
                 .saturating_sub(2)
                 .saturating_sub(wrapped.chars().count());
             println!(
@@ -102,7 +110,7 @@ pub fn panel(style: &Style, title: &str, body: &[String], accent: &str) {
     }
     println!(
         "  {}",
-        style.accent(accent, &format!("└{}┘", "─".repeat(PANEL_WIDTH)))
+        style.accent(accent, &format!("└{}┘", "─".repeat(INTERIOR)))
     );
 }
 
