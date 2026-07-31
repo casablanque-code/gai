@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [0.3.1] - 2026-07-31
+### Fixed
+- `doctor`/`explain`: a DNS query error (timeout, SERVFAIL, ...) was
+  indistinguishable from an authoritative NXDOMAIN — both silently became
+  `NotFound`. Now split via NetError::is_no_records_found(): a real
+  negative answer stays `NotFound`, everything else surfaces as `Skipped`
+  with the underlying reason.
+- `explain`/`doctor`: nameservers from resolved's Manager.DNS were pooled
+  flat across all links, so a link-scoped-only resolver (e.g. a VPN's
+  split-DNS server) could be queried for public names outside its zone
+  and SERVFAIL. Global-scope (ifindex 0) servers are now preferred.
+
+### Known limitations
+- Per-link/split-DNS domain routing (a name being routed to the specific
+  link's resolver based on systemd-resolved's search domains) is not
+  implemented — `gai` queries global-scope nameservers only. A name that
+  only resolves via a VPN/link-scoped resolver (e.g. Tailscale's
+  `*.ts.net`) will correctly report NOT FOUND rather than silently lying,
+  but won't actually resolve it either. Tracked as a follow-up.
+
 ## [0.3.0] - 2026-07-31
 ### Fixed
 - `doctor`/`explain`: a transient DNS query error (timeout, refused, ...) was
