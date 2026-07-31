@@ -3,7 +3,21 @@ use gai_core::platform::paths;
 use gai_core::sim::simulate;
 use gai_probe::resolved::flat_addresses;
 use gai_probe::{query_nameservers, reality, SystemSourceResolver};
+use std::net::IpAddr;
 use std::path::Path;
+
+/// Two address lists represent the same answer regardless of order — the
+/// order in which a resolver happens to return a set of A/AAAA records
+/// carries no meaning, so comparing them as ordered Vecs produces false
+/// "disagreement" diagnoses (e.g. localhost's `/etc/hosts` entry vs a DNS
+/// reality check both returning {127.0.0.1, ::1} in different orders).
+fn same_address_set(a: &[IpAddr], b: &[IpAddr]) -> bool {
+    let mut a = a.to_vec();
+    let mut b = b.to_vec();
+    a.sort();
+    b.sort();
+    a == b
+}
 
 pub fn run(name: &str) -> anyhow::Result<()> {
     let nss = parse_nsswitch(Path::new(paths::NSSWITCH_CONF))?;
@@ -103,8 +117,24 @@ pub fn run(name: &str) -> anyhow::Result<()> {
                  result on trust rather than as cross-checked.",
                 outcome.final_addresses
             ),
-            Some(reality) if reality.addresses == outcome.final_addresses => {
+            Some(reality) if same_address_set(&reality.addresses, &outcome.final_addresses) => {
                 println!("  Resolution succeeded and matches direct DNS. No discrepancy found.")
+            }
+            Some(reality)
+                if outcome
+                    .steps
+                    .last()
+                    .is_some_and(|s| s.source == gai_core::types::NssSource::Dns) =>
+            {
+                println!(
+                    "  The OS chain and a direct DNS query disagree: {:?} vs {:?}. Both \
+                     answers came from DNS itself, so this isn't an earlier source (files/mdns) \
+                     intercepting the name — it's more likely two separate queries landing on \
+                     different anycast/GeoDNS edges, or a change between queries. If this \
+                     persists for a name that should be static, that's worth digging into \
+                     further.",
+                    outcome.final_addresses, reality.addresses
+                )
             }
             Some(reality) => println!(
                 "  The OS chain and a direct DNS query disagree: {:?} vs {:?}. \
