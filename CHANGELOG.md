@@ -16,6 +16,10 @@ versioning follows [SemVer](https://semver.org/).
 - `doctor`: diagnosis no longer blames files/mdns for a mismatch when the
   simulated chain's own answer came from DNS itself (more likely anycast/
   GeoDNS variance between two separate queries).
+- `scripts/release.sh`: internal path-dependency pins between the three
+  crates were only bumped on an exact OLD_VERSION match, letting them
+  silently drift stale across a release; the bump is now unconditional
+  with a hard check that aborts before tagging if any pin is missed.
 
 ## [0.2.1] - 2026-07-20
 ### Fix and add readme publish on crates.io
