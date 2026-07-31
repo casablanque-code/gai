@@ -54,6 +54,7 @@ pub fn check(name: &str, servers: &[IpAddr]) -> anyhow::Result<RealityCheck> {
         // agreement or a false discrepancy.
         match resolver.lookup_ip(name).await {
             Ok(lookup) => anyhow::Ok(lookup.iter().collect()),
+            Err(e) if e.is_no_records_found() => anyhow::Ok(Vec::new()),
             Err(e) => Err(anyhow::anyhow!("DNS query failed: {e}")),
         }
     })?;

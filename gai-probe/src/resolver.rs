@@ -135,6 +135,19 @@ impl SystemSourceResolver {
                 // than surfacing that the check itself didn't run. Mirrors
                 // how lookup_mdns/lookup_mdns6 already handle their own
                 // query errors below.
+                // A query error (timeout, refused, network unreachable,
+                // ...) is not the same fact as an authoritative NXDOMAIN,
+                // and diagnosis logic downstream treats them very
+                // differently: `NotFound` is read as "DNS was asked and
+                // has no answer", while an error means DNS was never
+                // successfully asked at all. `NetError::is_no_records_found`
+                // is hickory's own way of distinguishing an authoritative
+                // negative answer (NXDOMAIN/NODATA) from every other kind
+                // of failure, so a legitimate "doesn't exist" still maps
+                // to NotFound while everything else surfaces as Skipped.
+                // Mirrors how lookup_mdns/lookup_mdns6 already handle
+                // their own query errors below.
+                Err(e) if e.is_no_records_found() => StepResult::NotFound,
                 Err(e) => StepResult::Skipped {
                     reason: format!("DNS query failed: {e}"),
                 },
