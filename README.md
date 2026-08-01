@@ -7,20 +7,27 @@ that path silently diverges.
 
 No process interception. No LD_PRELOAD, no eBPF, no ptrace. `gai` reads the
 same configuration the OS reads (`nsswitch.conf`, `resolv.conf`, `gai.conf`,
-`/etc/hosts`, systemd-resolved's D-Bus state, one-shot mDNS) and simulates
-the same decision the OS would make.
+`/etc/hosts`, systemd-resolved's D-Bus state, one-shot mDNS) and models the
+NSS decision path glibc's resolver would walk for that configuration — not
+every possible resolver a process might actually be running (see
+"Resolver runtime detection" below for the one case this flags explicitly).
 
 ## Example
 
 ```
 $ gai doctor testhost.local
 [gai] Simulating name resolution for "testhost.local"...
-  (reality check via [212.227.123.16, 212.227.123.17], systemd-resolved stub: true)
+
+  (reality check via 212.227.123.16, 212.227.123.17, systemd-resolved stub: true)
+
 RESOLUTION PATH (simulated):
-  1. [Files] Found([10.0.0.1])
+  1. Files          FOUND  10.0.0.1
+
 DIAGNOSIS:
-  The OS chain and a direct DNS query disagree: [10.0.0.1] vs []. Something
-  earlier in the chain (files/mdns) is answering instead of DNS.
+  ┌─ ISSUE ──────────────────────────────────────────────────────────────────┐
+  │ The OS chain and a direct DNS query disagree: 10.0.0.1 vs (none).        │
+  │ Something earlier in the chain (files/mdns) is answering instead of DNS. │
+  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 `testhost.local` was added to `/etc/hosts`. The chain halted there — DNS was
@@ -28,6 +35,11 @@ never asked. A direct, independent DNS query (against systemd-resolved's
 *real* per-link nameservers, not the `127.0.0.53` stub) confirms it: nobody
 out there has heard of this name. `gai` shows both sides instead of leaving
 you to guess which one lied.
+
+In a real terminal the `ISSUE`/`NOTE`/`OK` panel above is color-accented
+(red/yellow/green) by severity, and each resolution step gets its own
+FOUND/NOT FOUND/SKIPPED tag. Piped output or `NO_COLOR=1` falls back to the
+plain boxed text shown here.
 
 ## Usage
 
@@ -45,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/casablanque-code/gai/main/install.s
 
 Pulls the latest `x86_64-unknown-linux-musl` binary from
 [Releases](../../releases). Pin a version with
-`... | sudo bash -s -- v0.1.3`.
+`... | sudo bash -s -- v0.4.0`.
 
 ## Install via cargo
 
@@ -101,6 +113,14 @@ Linux only. macOS (`scutil`/mDNSResponder) and Windows (DNS Client/LLMNR/
 NetBIOS) are architecturally different enough that they're deliberately
 out of scope for now rather than bolted on. IPv6 mDNS (AAAA) queries are
 not yet implemented.
+
+Per-link/split-DNS domain routing (systemd-resolved routing a specific
+search domain to a specific link's nameserver — e.g. a VPN's private
+zone) is also not yet implemented: `gai` queries global-scope (`ifindex
+0`) nameservers only. A name that only resolves via a link-scoped
+resolver correctly reports `NOT FOUND` rather than a false positive, but
+won't actually resolve — this is a real gap, not a silent lie, and it's
+the next thing on deck.
 
 ## License
 
