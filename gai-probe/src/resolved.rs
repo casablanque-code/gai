@@ -19,23 +19,38 @@ pub struct ResolvedNameserver {
 ///
 /// Returns an empty vec (not an error) if resolved isn't running, since
 /// that's a perfectly normal system state, not a failure.
+/// 
+/// Logs a debug message if D-Bus is unavailable but doesn't error out,
+/// allowing graceful fallback to /etc/resolv.conf parsing.
 pub fn query_nameservers() -> anyhow::Result<Vec<ResolvedNameserver>> {
     let connection = match Connection::system() {
         Ok(c) => c,
-        Err(_) => return Ok(Vec::new()),
+        Err(e) => {
+            eprintln!("[gai] debug: systemd-resolved D-Bus unavailable ({}), falling back to resolv.conf", e);
+            return Ok(Vec::new());
+        }
     };
 
-    let proxy = zbus::blocking::Proxy::new(
+    let proxy = match zbus::blocking::Proxy::new(
         &connection,
         "org.freedesktop.resolve1",
         "/org/freedesktop/resolve1",
         "org.freedesktop.resolve1.Manager",
-    )?;
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[gai] debug: failed to create D-Bus proxy ({}), falling back to resolv.conf", e);
+            return Ok(Vec::new());
+        }
+    };
 
     let raw: Vec<RawDnsEntry> = match proxy.get_property("DNS") {
         Ok(v) => v,
         // resolved not running / property unavailable — not an error state.
-        Err(_) => return Ok(Vec::new()),
+        Err(e) => {
+            eprintln!("[gai] debug: could not query resolved's DNS property ({}), falling back to resolv.conf", e);
+            return Ok(Vec::new());
+        }
     };
 
     Ok(raw
