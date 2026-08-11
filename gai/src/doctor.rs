@@ -22,8 +22,36 @@ fn same_address_set(a: &[IpAddr], b: &[IpAddr]) -> bool {
     a == b
 }
 
-pub fn run(name: &str) -> anyhow::Result<()> {
+pub fn run(name: &str, binary: Option<&Path>) -> anyhow::Result<()> {
     let style = Style::detect();
+
+    if let Some(binary_path) = binary {
+        match gai_probe::detect_resolver_runtime(binary_path) {
+            Ok(gai_probe::ResolverRuntime::GoPureResolver) => {
+                println!(
+                    "{}",
+                    style.red(&format!(
+                        "[gai] WARNING: {} looks like a statically linked Go binary — it \
+                         ships its own pure-Go resolver and never touches nsswitch.conf, \
+                         glibc, or NSS. Everything below simulates the OS resolver, which \
+                         this process does not use.\n",
+                        binary_path.display()
+                    ))
+                );
+            }
+            Ok(_) => {}
+            Err(e) => {
+                println!(
+                    "{}",
+                    style.dim(&format!(
+                        "[gai] note: could not inspect {}: {e}\n",
+                        binary_path.display()
+                    ))
+                );
+            }
+        }
+    }
+
     let nss = parse_nsswitch(Path::new(paths::NSSWITCH_CONF))?;
     let resolv = parse_resolv_conf(Path::new(paths::RESOLV_CONF))?;
     let hosts = parse_hosts(Path::new(paths::HOSTS))?;

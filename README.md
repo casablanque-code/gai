@@ -59,6 +59,19 @@ Pulls the latest `x86_64-unknown-linux-musl` binary from
 [Releases](../../releases). Pin a version with
 `... | sudo bash -s -- v0.4.0`.
 
+`install.sh` needs root because it writes into a system directory — it does
+**not** take a custom output path or filename:
+
+- Installs to `/usr/local/bin/gai` (fixed location, not configurable).
+- Sets mode `0755` (`rwxr-xr-x`) via `install -m 0755`, same as any other
+  system binary — no `chmod` needed afterward.
+- Prints the install path and runs `gai --version` at the end so you can
+  confirm it landed correctly.
+
+To install somewhere else, download the release tarball yourself and move
+the extracted `gai` binary wherever you like — `install.sh` is a convenience
+wrapper for the common case, not a general-purpose installer.
+
 ## Install via cargo
 
 ```
@@ -88,10 +101,11 @@ cargo build --release --package gai-inspector
   explicitly disabled on the resolver — so it can never spuriously agree
   with a Files-based result just because both happened to read the same
   file.
-- **Resolver runtime detection** (best-effort): flags statically linked Go
-  binaries, which ship their own pure-Go resolver and bypass NSS entirely —
-  simulating `nsswitch.conf` for such a binary would be simulating the
-  wrong thing.
+- **Resolver runtime detection** (best-effort, opt-in via `--binary <path>`):
+  flags statically linked Go binaries, which ship their own pure-Go
+  resolver and bypass NSS entirely — simulating `nsswitch.conf` for such a
+  binary would be simulating the wrong thing. Example:
+  `gai doctor example.com --binary /usr/local/bin/my-go-app`.
 
 ## Workspace layout
 
