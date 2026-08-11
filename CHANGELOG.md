@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-08-11
+### Added
+- `doctor`/`why`: new `--binary <path>` flag. Detects statically linked Go
+  binaries (which ship their own pure-Go resolver and bypass NSS entirely)
+  and warns that the simulated OS chain doesn't apply to them. Previously
+  this detection existed in `gai-probe` but was never wired into the CLI.
+
+### Fixed
+- README: documented that `install.sh` always installs to `/usr/local/bin`
+  with mode `0755` and doesn't support a custom output path.
+
 ## [0.4.0] - 2026-07-31
 ### Added
 - `explain`/`doctor`: colored, boxed CLI output. Each resolution step now
