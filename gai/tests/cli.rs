@@ -95,3 +95,58 @@ fn doctor_and_why_are_interchangeable_aliases() {
     assert!(doctor_out.contains("DIAGNOSIS:"));
     assert!(why_out.contains("DIAGNOSIS:"));
 }
+
+#[test]
+fn doctor_binary_flag_warns_on_static_go_binary() {
+    // Real Go toolchain isn't guaranteed on every CI runner, so this
+    // doesn't build an actual Go binary — it crafts the minimal byte
+    // signature detect_resolver_runtime() actually looks for (a "Go
+    // build ID:" marker and no dynamic linker path), matching gai-core's
+    // fixture-based testing style rather than gai-probe's own unit tests
+    // (which cover detect_resolver_runtime directly; this test only
+    // checks the CLI wires that result into a visible warning).
+    let path = std::env::temp_dir().join("gai-cli-test-fake-go-binary");
+    std::fs::write(&path, b"\x7fELF...Go build ID: deadbeef...").unwrap();
+
+    gai()
+        .arg("doctor")
+        .arg("localhost")
+        .arg("--binary")
+        .arg(&path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("statically linked Go binary"));
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn doctor_binary_flag_dynamic_binary_gets_no_go_warning() {
+    // The gai binary itself is a normal dynamically linked ELF — pointing
+    // --binary at it must NOT trigger the Go-resolver warning.
+    let self_path = gai().get_program().to_owned();
+
+    gai()
+        .arg("doctor")
+        .arg("localhost")
+        .arg("--binary")
+        .arg(&self_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("statically linked Go binary").not());
+}
+
+#[test]
+fn doctor_binary_flag_missing_path_notes_instead_of_failing() {
+    // A bad --binary path shouldn't take down the whole doctor run —
+    // it should degrade to a note and still print the resolution path.
+    gai()
+        .arg("doctor")
+        .arg("localhost")
+        .arg("--binary")
+        .arg("/nonexistent/path/gai-cli-test-does-not-exist")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("could not inspect"))
+        .stdout(predicate::str::contains("DIAGNOSIS:"));
+}
