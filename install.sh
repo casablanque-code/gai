@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/casablanque-code/gai/main/install.sh | sudo bash
 #
 # Or pin a version:
-#   curl -fsSL .../install.sh | sudo bash -s -- v0.1.0
+#   curl -fsSL .../install.sh | sudo bash -s -- vX.Y.Z
 
 set -euo pipefail
 

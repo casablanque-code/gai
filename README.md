@@ -44,10 +44,14 @@ plain boxed text shown here.
 ## Usage
 
 ```
-gai explain <name>   # walk the resolution path, no verdict
-gai doctor <name>    # walk the path + diagnose discrepancies
-gai why <name>       # alias for doctor
+gai explain <name>                    # walk the resolution path, no verdict
+gai doctor <name> [--binary <path>]   # walk the path + diagnose discrepancies
+gai why <name> [--binary <path>]      # alias for doctor
 ```
+
+`--binary` is optional: point it at the binary that will actually be doing
+the resolving, and `gai` flags it if it's a statically linked Go binary
+(which bypasses NSS entirely — see "Resolver runtime detection" below).
 
 ## Install on a VPS (static binary, no Rust toolchain needed)
 
@@ -57,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/casablanque-code/gai/main/install.s
 
 Pulls the latest `x86_64-unknown-linux-musl` binary from
 [Releases](../../releases). Pin a version with
-`... | sudo bash -s -- v0.4.0`.
+`... | sudo bash -s -- v0.5.0`.
 
 `install.sh` needs root because it writes into a system directory — it does
 **not** take a custom output path or filename:
