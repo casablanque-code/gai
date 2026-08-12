@@ -133,3 +133,43 @@ fn scenario_realistic_multiline_nsswitch_conf() {
     assert_eq!(config.hosts[2].source, NssSource::Dns);
     assert_eq!(config.hosts[3].source, NssSource::Myhostname);
 }
+
+/// Regression test for a real bug report: authselect's default
+/// hosts: line on Fedora/RHEL/CentOS uses `[!UNAVAIL=return]` — negated
+/// criteria — which previously errored out entirely ("unknown status
+/// '!UNAVAIL'") instead of parsing. This is the exact line reported.
+#[test]
+fn scenario_fedora_authselect_negated_criterion_resolves_end_to_end() {
+    let fixture = write_nsswitch(
+        "hosts:      files myhostname mdns4_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] dns\n",
+    );
+    let config = parse_nsswitch(fixture.path()).expect("must parse, not error on '!UNAVAIL'");
+
+    let mut resolver = ScriptedResolver {
+        answers: vec![
+            (NssSource::Files, StepResult::NotFound),
+            (NssSource::Myhostname, StepResult::NotFound),
+            (NssSource::Mdns4Minimal, StepResult::NotFound),
+            (
+                NssSource::Resolve,
+                StepResult::Found(vec!["142.250.74.14".parse().unwrap()]),
+            ),
+            // dns should never be reached: resolve succeeded, and
+            // [!UNAVAIL=return] halts on anything other than UNAVAIL.
+            (
+                NssSource::Dns,
+                StepResult::Found(vec!["203.0.113.99".parse().unwrap()]),
+            ),
+        ],
+    };
+
+    let outcome = simulate(&config, "google.com", &mut resolver);
+
+    assert!(outcome.resolved());
+    assert_eq!(
+        outcome.final_addresses,
+        vec!["142.250.74.14".parse::<IpAddr>().unwrap()]
+    );
+    let reached_dns = outcome.steps.iter().any(|s| s.source == NssSource::Dns);
+    assert!(!reached_dns, "negated [!UNAVAIL=return] must halt on resolve's success");
+}

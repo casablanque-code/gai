@@ -41,6 +41,11 @@ pub struct NssCriterion {
     pub status: NssStatus,
     /// What happens to the chain when `status` is matched.
     pub action: NssAction,
+    /// True for `[!STATUS=action]` — the action fires on any status
+    /// OTHER than `status`, not on `status` itself. glibc/authselect
+    /// commonly emits this as `resolve [!UNAVAIL=return] dns`: trust
+    /// resolve fully, only fall through to dns if resolve itself is down.
+    pub negate: bool,
 }
 
 /// The classified outcome of trying one NSS source, used to match

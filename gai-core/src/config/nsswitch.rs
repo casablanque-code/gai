@@ -85,6 +85,11 @@ fn parse_source(token: &str) -> NssSource {
 }
 
 fn parse_criterion(body: &str, path: &Path, line_no: usize) -> Result<NssCriterion, ConfigError> {
+    let (negate, body) = match body.strip_prefix('!') {
+        Some(rest) => (true, rest),
+        None => (false, body),
+    };
+
     let (status_str, action_str) = body.split_once('=').ok_or_else(|| ConfigError::Parse {
         path: path.display().to_string(),
         line_no,
@@ -116,7 +121,11 @@ fn parse_criterion(body: &str, path: &Path, line_no: usize) -> Result<NssCriteri
         }
     };
 
-    Ok(NssCriterion { status, action })
+    Ok(NssCriterion {
+        status,
+        action,
+        negate,
+    })
 }
 
 #[cfg(test)]
@@ -141,7 +150,8 @@ mod tests {
             cfg.hosts[1].criteria,
             vec![NssCriterion {
                 status: NssStatus::NotFound,
-                action: NssAction::Return
+                action: NssAction::Return,
+                negate: false,
             }]
         );
         assert_eq!(cfg.hosts[2].source, NssSource::Dns);
@@ -155,5 +165,29 @@ mod tests {
         );
         let cfg = parse_nsswitch(f.path()).unwrap();
         assert_eq!(cfg.hosts.len(), 2);
+    }
+
+    #[test]
+    fn parses_negated_criterion_from_authselect_default() {
+        // Fedora/RHEL/CentOS ship this exact line via authselect by
+        // default: myhostname/mdns4_minimal/[NOTFOUND=return] mirror the
+        // existing sources, but `resolve [!UNAVAIL=return] dns` uses
+        // negation — "return unless resolve itself is UNAVAIL" — which
+        // previously errored out as an unrecognized status.
+        let f = write_fixture(
+            "hosts: files myhostname mdns4_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] dns\n",
+        );
+        let cfg = parse_nsswitch(f.path()).unwrap();
+        assert_eq!(cfg.hosts.len(), 5);
+        assert_eq!(cfg.hosts[3].source, NssSource::Resolve);
+        assert_eq!(
+            cfg.hosts[3].criteria,
+            vec![NssCriterion {
+                status: NssStatus::Unavail,
+                action: NssAction::Return,
+                negate: true,
+            }]
+        );
+        assert_eq!(cfg.hosts[4].source, NssSource::Dns);
     }
 }

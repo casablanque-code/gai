@@ -46,7 +46,11 @@ pub fn simulate(
     for entry in &config.hosts {
         let result = resolver.resolve(&entry.source, name);
         let status = classify(&result);
-        let matched_criterion = entry.criteria.iter().find(|c| c.status == status).cloned();
+        let matched_criterion = entry
+            .criteria
+            .iter()
+            .find(|c| if c.negate { c.status != status } else { c.status == status })
+            .cloned();
 
         let halts = match &matched_criterion {
             Some(NssCriterion {
@@ -121,6 +125,7 @@ mod tests {
                     criteria: vec![NssCriterion {
                         status: NssStatus::NotFound,
                         action: NssAction::Return,
+                        negate: false,
                     }],
                 },
                 NssEntry {
@@ -222,6 +227,7 @@ mod tests {
                     criteria: vec![NssCriterion {
                         status: NssStatus::Success,
                         action: NssAction::Continue,
+                        negate: false,
                     }],
                 },
                 NssEntry {
