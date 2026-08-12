@@ -172,6 +172,9 @@ impl SystemSourceResolver {
     /// This is what mdns4_minimal actually does under the hood — a single
     /// best-effort broadcast, not a persistent responder.
     fn lookup_mdns(name: &str) -> StepResult {
+        if let Some(reason) = Self::skip_non_local(name) {
+            return StepResult::Skipped { reason };
+        }
         match crate::mdns::query_a_record(name) {
             Ok(addrs) if !addrs.is_empty() => StepResult::Found(addrs),
             Ok(_) => StepResult::NotFound,
@@ -184,12 +187,37 @@ impl SystemSourceResolver {
     /// Same as `lookup_mdns` but for AAAA (IPv6) records, backing
     /// mdns6/mdns6_minimal.
     fn lookup_mdns6(name: &str) -> StepResult {
+        if let Some(reason) = Self::skip_non_local(name) {
+            return StepResult::Skipped { reason };
+        }
         match crate::mdns::query_aaaa_record(name) {
             Ok(addrs) if !addrs.is_empty() => StepResult::Found(addrs),
             Ok(_) => StepResult::NotFound,
             Err(e) => StepResult::Skipped {
                 reason: format!("mDNS AAAA query failed: {e}"),
             },
+        }
+    }
+
+    /// The real nss-mdns module never sends a packet for a name outside
+    /// its configured suffix list (`.local` by default, via
+    /// `/etc/mdns.allow` if present) — it returns UNAVAIL immediately,
+    /// specifically so an ordinary internet domain can't get caught by
+    /// its own `[NOTFOUND=return]` clause. Firing the probe unconditionally
+    /// here (as gai did before this fix) meant a bare `NOT FOUND` where
+    /// nss-mdns would've bailed out with UNAVAIL — misclassifying it as
+    /// the exact NOTFOUND=return trap this tool exists to catch, on names
+    /// that were never at risk of it. `/etc/mdns.allow`-style custom
+    /// suffix lists aren't read here yet — MVP scope is the `.local`
+    /// default, which covers the overwhelming majority of real configs.
+    fn skip_non_local(name: &str) -> Option<String> {
+        let n = name.trim_end_matches('.').to_ascii_lowercase();
+        if n.ends_with(".local") || n == "local" {
+            None
+        } else {
+            Some(format!(
+                "'{name}' doesn't end in .local — nss-mdns wouldn't query mDNS for this name at all (real UNAVAIL, not a probed NOT FOUND)"
+            ))
         }
     }
 }
@@ -209,5 +237,27 @@ impl SourceResolver for SystemSourceResolver {
                 reason: format!("unknown NSS source '{s}'"),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skip_non_local_gates_ordinary_internet_domains() {
+        // The bug this guards: google.com (or any non-.local name) must
+        // never reach the network probe — it should be reported as
+        // Skipped/Unavail, matching real nss-mdns, not a probed NotFound
+        // that would trip the common [NOTFOUND=return] clause.
+        assert!(SystemSourceResolver::skip_non_local("google.com").is_some());
+        assert!(SystemSourceResolver::skip_non_local("example.com.").is_some());
+    }
+
+    #[test]
+    fn skip_non_local_allows_dot_local_names() {
+        assert!(SystemSourceResolver::skip_non_local("printer.local").is_none());
+        assert!(SystemSourceResolver::skip_non_local("printer.local.").is_none());
+        assert!(SystemSourceResolver::skip_non_local("PRINTER.LOCAL").is_none());
     }
 }

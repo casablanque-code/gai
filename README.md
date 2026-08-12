@@ -99,8 +99,12 @@ cargo build --release --package gai-inspector
 - **systemd-resolved (D-Bus)**: when the stub is in play, queries
   `org.freedesktop.resolve1.Manager`'s `DNS` property for the real
   per-link nameservers hiding behind it.
-- **mDNS**: a genuine one-shot A-record query on `224.0.0.251:5353` for
-  the `mdns4_minimal`/`mdns4` NSS sources (IPv6/AAAA not yet implemented).
+- **mDNS**: a genuine one-shot A/AAAA-record query on `224.0.0.251:5353`
+  (`5353`/`ff02::fb` for IPv6) for the `mdns4_minimal`/`mdns4`/
+  `mdns6_minimal`/`mdns6` NSS sources — but only for names ending in
+  `.local`, matching real nss-mdns: any other name is reported `Skipped`
+  without ever touching the network, so an ordinary internet domain can't
+  get misclassified as tripping the `[NOTFOUND=return]` trap above.
 - **Reality check**: an independent DNS query — with `/etc/hosts` lookup
   explicitly disabled on the resolver — so it can never spuriously agree
   with a Files-based result just because both happened to read the same
@@ -129,8 +133,7 @@ tags, and pushes in one step.
 
 Linux only. macOS (`scutil`/mDNSResponder) and Windows (DNS Client/LLMNR/
 NetBIOS) are architecturally different enough that they're deliberately
-out of scope for now rather than bolted on. IPv6 mDNS (AAAA) queries are
-not yet implemented.
+out of scope for now rather than bolted on.
 
 Per-link/split-DNS domain routing (systemd-resolved routing a specific
 search domain to a specific link's nameserver — e.g. a VPN's private
