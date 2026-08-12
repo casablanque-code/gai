@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [0.5.1] - 2026-08-12
+### Fixed
+- `nsswitch.conf` parser: support negated `[!STATUS=action]` criteria.
+  Previously errored with `unknown status '!UNAVAIL'` on authselect's
+  default `hosts:` line — the standard config on every Fedora/RHEL/CentOS
+  install, so this hit any user on those distros running `gai` at all.
+- `mdns4_minimal`/`mdns4`/`mdns6_minimal`/`mdns6`: gate the mDNS probe to
+  names ending in `.local`, matching real nss-mdns. Previously an ordinary
+  internet domain (e.g. `google.com`) triggered a real multicast query,
+  got no answer, and was misreported as `NOT FOUND` — tripping the common
+  `[NOTFOUND=return]` clause and producing a false `ISSUE` diagnosis for
+  a domain that was never actually broken.
+- README: documented the `.local` mDNS gating above, and corrected two
+  stale "IPv6/AAAA not yet implemented" claims — `mdns6`/`mdns6_minimal`
+  support already existed in code.
+
 ## [0.5.0] - 2026-08-11
 ### Added
 - `doctor`/`why`: new `--binary <path>` flag. Detects statically linked Go
