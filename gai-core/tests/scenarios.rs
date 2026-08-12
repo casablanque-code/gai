@@ -149,7 +149,15 @@ fn scenario_fedora_authselect_negated_criterion_resolves_end_to_end() {
         answers: vec![
             (NssSource::Files, StepResult::NotFound),
             (NssSource::Myhostname, StepResult::NotFound),
-            (NssSource::Mdns4Minimal, StepResult::NotFound),
+            // Unavail (not NotFound), so the preceding [NOTFOUND=return]
+            // on mdns4_minimal doesn't fire and the chain actually
+            // reaches `resolve` — this is the whole point of the test.
+            (
+                NssSource::Mdns4Minimal,
+                StepResult::Skipped {
+                    reason: "mdns not applicable to this name".into(),
+                },
+            ),
             (
                 NssSource::Resolve,
                 StepResult::Found(vec!["142.250.74.14".parse().unwrap()]),
