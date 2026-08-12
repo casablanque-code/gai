@@ -49,7 +49,13 @@ pub fn simulate(
         let matched_criterion = entry
             .criteria
             .iter()
-            .find(|c| if c.negate { c.status != status } else { c.status == status })
+            .find(|c| {
+                if c.negate {
+                    c.status != status
+                } else {
+                    c.status == status
+                }
+            })
             .cloned();
 
         let halts = match &matched_criterion {

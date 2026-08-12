@@ -179,5 +179,8 @@ fn scenario_fedora_authselect_negated_criterion_resolves_end_to_end() {
         vec!["142.250.74.14".parse::<IpAddr>().unwrap()]
     );
     let reached_dns = outcome.steps.iter().any(|s| s.source == NssSource::Dns);
-    assert!(!reached_dns, "negated [!UNAVAIL=return] must halt on resolve's success");
+    assert!(
+        !reached_dns,
+        "negated [!UNAVAIL=return] must halt on resolve's success"
+    );
 }
